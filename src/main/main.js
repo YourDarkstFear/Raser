@@ -24,7 +24,13 @@ const APP_ID = 'io.github.darkness38.raser';
 const IS_MAC = process.platform === 'darwin';
 
 app.setName('Raser');
-if (process.platform === 'win32') app.setAppUserModelId(APP_ID);
+if (process.platform === 'win32') {
+  app.setAppUserModelId(APP_ID);
+} else if (process.platform === 'linux') {
+  if (typeof app.setDesktopName === 'function') {
+    app.setDesktopName('raser.desktop');
+  }
+}
 
 function encryptAccount(dataObj) {
   const jsonStr = typeof dataObj === 'string' ? dataObj : JSON.stringify(dataObj);
@@ -409,6 +415,7 @@ function runGUI() {
       minHeight: 540,
                                    backgroundColor: firstRun ? '#8d5ef2' : '#000000',
                                    title: 'Raser',
+                                   name: 'Raser',
                                    icon: path.join(__dirname, '../../assets', 'icon.png'),
                                    // macOS keeps its native traffic lights; frame:false would remove
                                    // them and the custom window buttons are hidden there.
