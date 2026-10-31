@@ -14161,6 +14161,26 @@ function bindCoverHoldZoom(wrapEl) {
     el.btnRepeat.classList.toggle('active', mode !== 'off');
     el.btnRepeat.classList.toggle('repeat-one', mode === 'one');
 
+    const svg = el.btnRepeat.querySelector('svg');
+    if (svg) {
+      const digit = svg.querySelector('.repeat-one-digit');
+      if (digit) digit.remove();
+      if (!svg.dataset.baseSvg) {
+        svg.dataset.baseSvg = svg.innerHTML.trim();
+      }
+      if (mode === 'one') {
+        const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        p.setAttribute('class', 'repeat-one-digit');
+        p.setAttribute('d', 'M11 10.2l1.6-1.1v5M10.2 14.2h3.2');
+        p.setAttribute('stroke', 'currentColor');
+        p.setAttribute('stroke-width', '2.2');
+        p.setAttribute('stroke-linecap', 'round');
+        p.setAttribute('stroke-linejoin', 'round');
+        p.setAttribute('fill', 'none');
+        svg.appendChild(p);
+      }
+    }
+
     const titles = {
       off: 'Repeat: Off',
       all: 'Repeat: All',
