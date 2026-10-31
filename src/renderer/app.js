@@ -14205,15 +14205,6 @@ function bindCoverHoldZoom(wrapEl) {
     localStorage.setItem('riff_repeat', next === 'one' ? '1' : (next === 'all' ? 'all' : '0'));
 
     updateRepeatUI();
-
-    const toastMsgs = {
-      off: 'Repeat off',
-      all: 'Repeat all',
-      one: 'Repeat one'
-    };
-    if (typeof showToast === 'function') {
-      showToast(toastMsgs[next] || next);
-    }
   }
 
   if (el.btnRepeat) {
