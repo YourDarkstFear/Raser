@@ -2987,16 +2987,27 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
         .sort((a, b) => b.score - a.score)
         .slice(0, maxCand);
       rankedCandidates.forEach(item => failedYtIds.add(item.cand.id));
-      const streamResults = await Promise.all(rankedCandidates.map(async ({ cand }) => {
+      if (rankedCandidates.length > 0) {
+        const topCandidate = rankedCandidates[0];
         try {
-          const url = await resolveYtCandidateStream(cand.id);
-          return url ? { url, id: cand.id } : null;
-        } catch (_) {
-          return null;
+          const topUrl = await resolveYtCandidateStream(topCandidate.cand.id);
+          if (topUrl) return sendStreamResponse(topUrl, topCandidate.cand.id);
+        } catch (_) {}
+
+        const remaining = rankedCandidates.slice(1);
+        if (remaining.length > 0) {
+          const streamResults = await Promise.all(remaining.map(async ({ cand }) => {
+            try {
+              const url = await resolveYtCandidateStream(cand.id);
+              return url ? { url, id: cand.id } : null;
+            } catch (_) {
+              return null;
+            }
+          }));
+          const bestMatch = streamResults.find(result => result !== null);
+          if (bestMatch) return sendStreamResponse(bestMatch.url, bestMatch.id);
         }
-      }));
-      const bestMatch = streamResults.find(result => result !== null);
-      if (bestMatch) return sendStreamResponse(bestMatch.url, bestMatch.id);
+      }
 
     }
 
@@ -8551,6 +8562,7 @@ function writePortFile(p) {
 }
 
 function startServer(port = PORT) {
+  try { require('./tools').cleanupStalePyinstallerDirs(); } catch (_) {}
   if (server.listening) {
     const address = server.address();
     return Promise.resolve(address && typeof address === 'object' ? address.port : port);

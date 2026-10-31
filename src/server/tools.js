@@ -4,16 +4,30 @@ const path = require('path');
 const https = require('https');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
-const { IS_WIN, BIN_DIR, resolveBinary, clearBinaryCache } = require('../shared/platform');
+const { IS_WIN, BIN_DIR, resolveBinary, clearBinaryCache, findInPath } = require('../shared/platform');
 const logger = require('../shared/logger');
 
 const state = { status: 'idle', tool: '', percent: 0, error: '', ffmpegError: '' };
 const STAMP = path.join(BIN_DIR, '.ytdlp-update-stamp');
 
+function cleanupStalePyinstallerDirs() {
+  try {
+    const tmpDir = os.tmpdir();
+    const entries = fs.readdirSync(tmpDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name.startsWith('_MEI')) {
+        const full = path.join(tmpDir, entry.name);
+        try { fs.rmSync(full, { recursive: true, force: true }); } catch (_) {}
+      }
+    }
+  } catch (_) {}
+}
+
 function ytDlpAsset() {
   const a = process.arch;
   if (IS_WIN) return a === 'arm64' ? 'yt-dlp_arm64.exe' : a === 'ia32' ? 'yt-dlp_x86.exe' : 'yt-dlp.exe';
   if (process.platform === 'darwin') return 'yt-dlp_macos';
+  if (findInPath('python3') || findInPath('python')) return 'yt-dlp';
   return a === 'arm64' ? 'yt-dlp_linux_aarch64' : 'yt-dlp_linux';
 }
 
@@ -313,4 +327,4 @@ async function updateYtDlpIfManaged() {
   }
 }
 
-module.exports = { ensureTools, toolsStatus, checkStatus, updateYtDlpIfManaged, expectedHash, ytDlpAsset, ffmpegAsset };
+module.exports = { ensureTools, toolsStatus, checkStatus, updateYtDlpIfManaged, expectedHash, ytDlpAsset, ffmpegAsset, cleanupStalePyinstallerDirs };
