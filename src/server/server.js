@@ -295,6 +295,7 @@ const urlCache = streamUrlCache;
 const streamInfoInflight = new Map();
 const lyricsCache = new Map();
 const artistCache = new Map();
+const resolvedTrackIdCache = new Map();
 const vibeCache = new Map();
 const ytArtistCache = new Map();
 const scClientCache = new Map();
@@ -2545,78 +2546,137 @@ async function handleTrending(req, res) {
   res.end(JSON.stringify({ success: true, tracks: tracks || [] }));
 }
 
-function scoreImportedCandidate(targetTitle, targetArtist, targetDur, cand) {
-  if (!cand || !cand.title) return -999;
-  const norm = (s) => String(s || '').toLowerCase()
+function normText(s) {
+  return String(s || '').toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
 
-  const tTitle = norm(targetTitle);
-  const cTitle = norm(cand.title);
-  const tArtist = norm(targetArtist.split(/[,;&\/]|feat\.?|ft\.?/i)[0] || targetArtist);
-  const cArtist = norm(cand.artist);
-  const cFull = `${cArtist} ${cTitle}`;
+function stripNoiseFromTitle(str) {
+  return String(str || '')
+    .replace(/\s*[\(\[]\s*(?:official\s*(?:music\s*)?(?:video|audio|lyric\s*video|visualizer)|lyrics?\s*video|lyrics?|visualizer|hd|hq|4k|mv|clip|audio)\s*[\)\]]/gi, '')
+    .replace(/\s*[\(\[]\s*(?:feat\.?|ft\.?|prod\.?|featuring)[^)]*[\)\]]/gi, '')
+    .replace(/\s*[\(\[]\s*(?:remaster(?:ed)?(?:\s*\d{4})?|\d{4}\s*remaster(?:ed)?|deluxe(?:\s*edition)?|bonus\s*track|radio\s*edit|mono|stereo)[^\]\)]*[\)\]]/gi, '')
+    .replace(/\s*-\s*(?:remaster(?:ed)?(?:\s*\d{4})?|\d{4}\s*remaster(?:ed)?|deluxe(?:\s*edition)?|bonus\s*track|radio\s*edit|official\s*(?:music\s*)?(?:video|audio))/gi, '')
+    .trim();
+}
 
-  if (!tTitle || !cTitle) return -999;
+function extractArtists(str) {
+  return String(str || '')
+    .replace(/\s*-\s*Topic$/i, '')
+    .replace(/\bVEVO$/i, '')
+    .split(/[,;&\/]|(?:\s+(?:feat\.?|ft\.?|featuring|with|x)\s+)/i)
+    .map(a => normText(a))
+    .filter(a => a.length > 0 && a !== 'unknown artist');
+}
+
+function scoreImportedCandidate(targetTitle, targetArtist, targetDur, cand) {
+  if (!cand || !cand.title) return -999;
+
+  const tTitleRaw = normText(targetTitle);
+  const cTitleRaw = normText(cand.title);
+  if (!tTitleRaw || !cTitleRaw) return -999;
+
+  const tTitleClean = normText(stripNoiseFromTitle(targetTitle));
+  const cTitleClean = normText(stripNoiseFromTitle(cand.title));
+
+  const tArtists = extractArtists(targetArtist);
+  const primaryTArtist = tArtists[0] || '';
+  const cArtistNorm = normText(String(cand.artist || '').replace(/\s*-\s*Topic$/i, ''));
+  const cFullNorm = `${cArtistNorm} ${cTitleRaw}`;
 
   let score = 0;
-  if (cTitle === tTitle) score += 55;
-  else if (cTitle.includes(tTitle) || tTitle.includes(cTitle)) score += 35;
-  else {
-    const tWords = tTitle.split(' ').filter(w => w.length > 1);
-    if (tWords.length > 0) {
-      const hits = tWords.filter(w => cTitle.includes(w)).length;
-      const ratio = hits / tWords.length;
-      if (ratio < 0.45) return -500;
-      score += ratio * 28;
-    }
-  }
 
-  if (tArtist && tArtist !== 'unknown artist') {
-    if (cArtist === tArtist || cArtist.includes(tArtist) || tArtist.includes(cArtist)) {
+  // 1. ŞARKI İSMİ KONTROLÜ (Deep Title Match)
+  if (tTitleClean && cTitleClean) {
+    if (tTitleClean === cTitleClean) {
+      score += 65;
+    } else if (cTitleClean.includes(tTitleClean) || tTitleClean.includes(cTitleClean)) {
       score += 45;
-    } else if (cFull.includes(tArtist)) {
-      score += 32;
     } else {
-      score -= 35;
+      const tWords = tTitleClean.split(' ').filter(w => w.length > 1);
+      if (tWords.length > 0) {
+        const hits = tWords.filter(w => cTitleClean.includes(w)).length;
+        const ratio = hits / tWords.length;
+        if (ratio < 0.45 && !cTitleRaw.includes(tTitleClean)) return -500;
+        score += ratio * 32;
+      }
     }
   }
 
-  const modifiers = ['slowed', 'reverb', 'sped up', 'speed up', 'nightcore', 'hardstyle', 'remix', 'bootleg', 'mashup', '8d', 'karaoke', 'instrumental', 'cover', 'live', 'tribute', 'bass boosted', 'phonk remix', 'edit'];
-  for (const mod of modifiers) {
-    const inTarget = tTitle.includes(mod) || norm(targetArtist).includes(mod);
-    const inCand = cFull.includes(mod);
-    if (inCand && !inTarget) score -= 95;
-    else if (inCand && inTarget) score += 22;
+  // 2. SANATÇI / ŞARKICI KONTROLÜ (Deep Artist Match)
+  if (primaryTArtist) {
+    let artistMatched = false;
+    if (cArtistNorm === primaryTArtist || cArtistNorm.includes(primaryTArtist) || primaryTArtist.includes(cArtistNorm)) {
+      score += 50;
+      artistMatched = true;
+    } else if (cFullNorm.includes(primaryTArtist)) {
+      score += 35;
+      artistMatched = true;
+    }
+
+    if (tArtists.length > 1) {
+      for (let i = 1; i < tArtists.length; i++) {
+        const secArtist = tArtists[i];
+        if (secArtist && (cFullNorm.includes(secArtist) || cArtistNorm.includes(secArtist))) {
+          score += 15;
+          artistMatched = true;
+        }
+      }
+    }
+
+    if (!artistMatched) {
+      score -= 75;
+    }
   }
 
+  // 3. RESMİ STÜDYO KAYDI / TOPIC AUDIO ÖNCELİĞİ
+  const isTopic = String(cand.artist || '').endsWith('- Topic') || String(cand.channel || '').endsWith('- Topic');
+  if (isTopic) score += 35;
+  if (/official\s*audio|\baudio\b/i.test(cand.title) && !/official\s*video|music\s*video/i.test(cand.title)) {
+    score += 20;
+  }
+
+  // 4. İSTENMEYEN VEYA REMIX MODİFİKATÖRLERİ
+  const destructiveMods = ['cover', 'karaoke', 'instrumental', 'tribute'];
+  for (const mod of destructiveMods) {
+    const inTarget = tTitleRaw.includes(mod) || normText(targetArtist).includes(mod);
+    const inCand = cFullNorm.includes(mod);
+    if (inCand && !inTarget) return -500;
+  }
+
+  const otherMods = ['slowed', 'reverb', 'sped up', 'speed up', 'nightcore', 'hardstyle', 'remix', 'bootleg', 'mashup', '8d', 'live', 'bass boosted', 'phonk remix', 'edit', 'acoustic'];
+  for (const mod of otherMods) {
+    const inTarget = tTitleRaw.includes(mod) || normText(targetArtist).includes(mod);
+    const inCand = cFullNorm.includes(mod);
+    if (inCand && !inTarget) score -= 85;
+    else if (inCand && inTarget) score += 25;
+  }
+
+  // 5. SÜRE (DURATION) TOLERANSI VE AKILLI PUANLAMA
   const tDur = Number(targetDur) || 0;
   const cDur = Number(cand.duration) || 0;
-  if (tDur > 30 && cDur > 30) {
+  if (tDur > 20 && cDur > 0) {
     const diff = Math.abs(tDur - cDur);
-    if (diff > Math.max(30, tDur * 0.25)) return -500;
+    if (cDur > 3000 && tDur < 900) return -500;
+    if (cDur < 30) return -500;
+    if (diff > 180 && diff > tDur * 0.8) return -500;
+
     if (diff <= 3) score += 35;
-    else if (diff <= 8) score += 20;
-    else if (diff <= 15) score += 8;
+    else if (diff <= 8) score += 22;
+    else if (diff <= 15) score += 10;
+    else if (diff <= 35) score -= 12;
+    else if (diff <= 65) score -= 35;
+    else score -= 75;
   }
-  if (tDur > 45 && cDur > 0 && cDur < 35) return -500;
 
   return score;
 }
 
 function makeCleanSearchQuery(artist, title) {
-  const cleanA = String(artist || '')
-    .replace(/\s*-\s*Topic$/i, '')
-    .replace(/\bVEVO$/i, '')
-    .split(/[,;&\/]|feat\.?|ft\.?/i)[0]
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  const cleanT = String(title || '')
-    .replace(/\s*[\(\[]\s*(?:feat\.?|ft\.?|prod\.?|featuring)[^)]*[\)\]]/gi, '')
-    .replace(/\s*[\(\[]\s*(?:official\s*(?:music\s*)?(?:video|audio|lyric\s*video|visualizer)|lyrics?\s*video|lyrics?|visualizer|hd|hq|4k|mv|clip)\s*[\)\]]/gi, '')
+  const cleanA = extractArtists(artist).slice(0, 2).join(' ');
+  const cleanT = stripNoiseFromTitle(title)
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -2669,7 +2729,15 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
   if (!cleanId && trackUrl && trackUrl.includes('v=')) {
     cleanId = cleanTrackId(trackUrl.split('v=')[1].split('&')[0]);
   }
-  const isRealYtId = /^[a-zA-Z0-9_-]{11}$/.test(cleanId) && !/^(cand_|dz_|it_|sp_|ym_)/i.test(cleanId);
+  let isRealYtId = /^[a-zA-Z0-9_-]{11}$/.test(cleanId) && !/^(cand_|dz_|it_|sp_|ym_)/i.test(cleanId);
+  const trackLookupKey = cleanId || trackId || (title && artist ? `${normText(artist)}_${normText(title)}` : '');
+  if (!isRealYtId && trackLookupKey && resolvedTrackIdCache.has(trackLookupKey)) {
+    const cachedYtId = resolvedTrackIdCache.get(trackLookupKey);
+    if (/^[a-zA-Z0-9_-]{11}$/.test(cachedYtId)) {
+      cleanId = cachedYtId;
+      isRealYtId = true;
+    }
+  }
   if (!isRealYtId && trackUrl && /cand_|dz_|it_|sp_|ym_/i.test(trackUrl)) {
     trackUrl = '';
   }
@@ -2790,7 +2858,14 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
         proxyUrl: proxied,
         isHls: isHls
       };
-      if (resolvedId) data.resolvedId = resolvedId;
+      if (resolvedId) {
+        data.resolvedId = resolvedId;
+        if (/^[a-zA-Z0-9_-]{11}$/.test(resolvedId)) {
+          if (cleanId) resolvedTrackIdCache.set(cleanId, resolvedId);
+          if (trackId) resolvedTrackIdCache.set(trackId, resolvedId);
+          if (title && artist) resolvedTrackIdCache.set(`${normText(artist)}_${normText(title)}`, resolvedId);
+        }
+      }
       if (cacheKey) streamUrlCache.set(cacheKey, { timestamp: Date.now(), data });
       if (finalId && finalId !== cacheKey) streamUrlCache.set(finalId + '_' + quality, { timestamp: Date.now(), data });
       if (canUseLocalAudio && finalId) setTimeout(() => downloadTrackToDisk(trackUrl || `https://www.youtube.com/watch?v=${finalId}`, finalId, 'youtube', meta), 45000);
@@ -2912,7 +2987,7 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
 
     const searchQ = makeCleanSearchQuery(artist, title) || q;
     if (!streamUrl && searchQ) {
-      const maxCand = needYtAuth ? 1 : 3;
+      const maxCand = needYtAuth ? 1 : 4;
       const [ytmHits, ytHits] = await Promise.all([
         ytmusicSearch(searchQ, { timeoutMs: 3500, maxRetries: 0, fallback: false }).catch(() => []),
         directYoutubeSearch(searchQ, false, 12).catch(() => [])
@@ -2925,7 +3000,7 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
       }
       const rankedCandidates = Array.from(candidates.values())
         .map(cand => ({ cand, score: scoreImportedCandidate(title || searchQ, artist, duration, cand) }))
-        .filter(item => item.score >= (artist && !/^unknown artist$/i.test(artist.trim()) ? 70 : 45))
+        .filter(item => item.score >= (artist && !/^unknown artist$/i.test(artist.trim()) ? 60 : 40))
         .sort((a, b) => b.score - a.score)
         .slice(0, maxCand);
       rankedCandidates.forEach(item => failedYtIds.add(item.cand.id));
@@ -5577,7 +5652,8 @@ async function trySpotifyWebApi(playlistId) {
           artist: Array.isArray(t.artists) ? t.artists.map(a => a.name).join(', ') : '',
           duration: t.duration_ms ? Math.round(t.duration_ms / 1000) : undefined,
           cover,
-          thumbnail: cover
+          thumbnail: cover,
+          isrc: t.external_ids?.isrc || ''
         };
       }).filter(t => t.title);
       return { success: true, name, cover, tracks, total: tracks.length };

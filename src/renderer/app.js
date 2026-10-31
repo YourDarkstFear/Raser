@@ -4251,12 +4251,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (nextTrack && !nextTrack._preloadedStreamUrl && !nextTrack.isCached && nextTrack.platform !== 'local') {
       const qQuality = encodeURIComponent(localStorage.getItem('riff_audio_quality') || 'medium');
       const qFallback = encodeURIComponent(nextTrack.searchQuery || ((nextTrack.artist ? nextTrack.artist + ' - ' : '') + nextTrack.title));
-      const fetchUrl = `http://127.0.0.1:${state.serverPort}/api/stream-info?id=${encodeURIComponent(nextTrack.id || '')}&url=${encodeURIComponent(nextTrack.url || '')}&platform=${encodeURIComponent(nextTrack.platform || 'youtube')}&title=${encodeURIComponent(nextTrack.title || '')}&artist=${encodeURIComponent(nextTrack.artist || '')}&duration=${encodeURIComponent(nextTrack.duration || 0)}&thumbnail=${encodeURIComponent(nextTrack.thumbnail || '')}&q=${qFallback}&quality=${qQuality}`;
+      const fetchUrl = `http://127.0.0.1:${state.serverPort}/api/stream-info?id=${encodeURIComponent(nextTrack.resolvedId || nextTrack.id || '')}&url=${encodeURIComponent(nextTrack.url || '')}&platform=${encodeURIComponent(nextTrack.platform || 'youtube')}&title=${encodeURIComponent(nextTrack.title || '')}&artist=${encodeURIComponent(nextTrack.artist || '')}&duration=${encodeURIComponent(nextTrack.duration || 0)}&thumbnail=${encodeURIComponent(nextTrack.thumbnail || '')}&q=${qFallback}&quality=${qQuality}`;
       try {
         const res = await fetch(fetchUrl);
         const data = await res.json();
         if (data && data.success && data.streamUrl) {
           nextTrack._preloadedStreamUrl = data.streamUrl;
+          if (data.resolvedId) nextTrack.resolvedId = data.resolvedId;
           nextTrack._preloadedStreamQuality = localStorage.getItem('riff_audio_quality') || 'medium';
         }
       } catch (_) {}
@@ -4469,7 +4470,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       let resolvedUrl = track.url;
-      let resolvedId = track.id;
+      let resolvedId = track.resolvedId || track.id;
 
       const qQuality = encodeURIComponent(localStorage.getItem('riff_audio_quality') || 'medium');
       const qSearch = encodeURIComponent(track.searchQuery || ((track.artist ? track.artist + ' - ' : '') + track.title));
@@ -4495,6 +4496,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           throw new Error('Offline: track not cached locally');
         }
         throw new Error((data && data.error) || 'Failed to extract audio stream');
+      }
+
+      if (data.resolvedId) {
+        track.resolvedId = data.resolvedId;
       }
 
       track._preloadedStreamUrl = data.streamUrl;
