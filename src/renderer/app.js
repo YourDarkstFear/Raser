@@ -4247,20 +4247,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   let preloadedTrack10sFired = false;
   async function preloadNextTrackStream() {
     if (!state.queue || state.queueIndex < 0) return;
-    const nextTrack = state.queue[state.queueIndex + 1];
-    if (nextTrack && !nextTrack._preloadedStreamUrl && !nextTrack.isCached && nextTrack.platform !== 'local') {
-      const qQuality = encodeURIComponent(localStorage.getItem('riff_audio_quality') || 'medium');
-      const qFallback = encodeURIComponent(nextTrack.searchQuery || ((nextTrack.artist ? nextTrack.artist + ' - ' : '') + nextTrack.title));
-      const fetchUrl = `http://127.0.0.1:${state.serverPort}/api/stream-info?id=${encodeURIComponent(nextTrack.resolvedId || nextTrack.id || '')}&url=${encodeURIComponent(nextTrack.url || '')}&platform=${encodeURIComponent(nextTrack.platform || 'youtube')}&title=${encodeURIComponent(nextTrack.title || '')}&artist=${encodeURIComponent(nextTrack.artist || '')}&duration=${encodeURIComponent(nextTrack.duration || 0)}&thumbnail=${encodeURIComponent(nextTrack.thumbnail || '')}&q=${qFallback}&quality=${qQuality}`;
-      try {
-        const res = await fetch(fetchUrl);
-        const data = await res.json();
-        if (data && data.success && data.streamUrl) {
-          nextTrack._preloadedStreamUrl = data.streamUrl;
-          if (data.resolvedId) nextTrack.resolvedId = data.resolvedId;
-          nextTrack._preloadedStreamQuality = localStorage.getItem('riff_audio_quality') || 'medium';
-        }
-      } catch (_) {}
+    const candidates = [state.queue[state.queueIndex + 1], state.queue[state.queueIndex + 2]].filter(Boolean);
+    for (const nextTrack of candidates) {
+      if (nextTrack && !nextTrack._preloadedStreamUrl && !nextTrack.isCached && nextTrack.platform !== 'local') {
+        const qQuality = encodeURIComponent(localStorage.getItem('riff_audio_quality') || 'medium');
+        const qFallback = encodeURIComponent(nextTrack.searchQuery || ((nextTrack.artist ? nextTrack.artist + ' - ' : '') + nextTrack.title));
+        const fetchUrl = `http://127.0.0.1:${state.serverPort}/api/stream-info?id=${encodeURIComponent(nextTrack.resolvedId || nextTrack.id || '')}&url=${encodeURIComponent(nextTrack.url || '')}&platform=${encodeURIComponent(nextTrack.platform || 'youtube')}&title=${encodeURIComponent(nextTrack.title || '')}&artist=${encodeURIComponent(nextTrack.artist || '')}&duration=${encodeURIComponent(nextTrack.duration || 0)}&thumbnail=${encodeURIComponent(nextTrack.thumbnail || '')}&q=${qFallback}&quality=${qQuality}`;
+        try {
+          const res = await fetch(fetchUrl);
+          const data = await res.json();
+          if (data && data.success && data.streamUrl) {
+            nextTrack._preloadedStreamUrl = data.streamUrl;
+            if (data.resolvedId) nextTrack.resolvedId = data.resolvedId;
+            nextTrack._preloadedStreamQuality = localStorage.getItem('riff_audio_quality') || 'medium';
+          }
+        } catch (_) {}
+      }
     }
   }
 

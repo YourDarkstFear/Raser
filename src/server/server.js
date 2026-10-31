@@ -655,7 +655,7 @@ function verifyStreamPlayable(streamUrl, userAgent, redirectsLeft = 3) {
         timeout: 5000,
         headers: Object.assign({
           'Host': parsed.host,
-          'Range': 'bytes=0-',
+          'Range': 'bytes=0-16383',
           'User-Agent': ua,
           // Same header set yt-dlp/ffmpeg uses for googlevideo.
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -2887,6 +2887,7 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
       // YouTube Origin header. Try it cookie-free first: it is the fastest and
       // most reliable path, and cookies can trigger "unavailable (152-18)".
       const attempts = [];
+      attempts.push({ clientSpec: 'default', cookies: false });
       attempts.push({ clientSpec: 'web_embedded,web,tv', cookies: false });
       if (hasCookies) attempts.push({ clientSpec: 'web_embedded,web,tv', cookies: true });
       attempts.push({ clientSpec: 'ios', cookies: false });
@@ -2901,12 +2902,13 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
         for (let tryNo = 0; tryNo < 2 && !s && !stopAttempts; tryNo++) {
           let retryable = false;
           try {
+            const targetFmt = forShare ? audioFormat : (ytDlpQualityFormat.includes('ba/bestaudio') ? ytDlpQualityFormat : (ytDlpQualityFormat + '/ba/bestaudio/18/best'));
             const args = [
               '--no-config', '-g', '--no-warnings', '--no-playlist', '--no-check-certificates',
               '--js-runtimes', 'node', '--remote-components', 'ejs:github',
               '--socket-timeout', '6', '--retries', '1',
-              '--extractor-args', 'youtube:player_client=' + attempt.clientSpec,
-              '-f', (forShare ? audioFormat : ytDlpQualityFormat),
+              ...(attempt.clientSpec && attempt.clientSpec !== 'default' ? ['--extractor-args', 'youtube:player_client=' + attempt.clientSpec] : []),
+              '-f', targetFmt,
               '--', vUrl
             ];
             const raw = await runYtDlp(args, 18000, { noCookies: !attempt.cookies, quiet: true });
