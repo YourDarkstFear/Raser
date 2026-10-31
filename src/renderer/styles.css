@@ -2910,6 +2910,7 @@ body.m3-cover-on .artwork-wrapper {
   border-radius: var(--md-shape-corner-full, 9999px);
   background: var(--md-sys-color-surface-container-high);
   opacity: 0.85;
+  position: relative;
 }
 #btn-shuffle:hover,
 #btn-repeat:hover {
@@ -2922,6 +2923,26 @@ body.m3-cover-on .artwork-wrapper {
   color: var(--md-sys-color-on-primary);
   opacity: 1;
   box-shadow: 0 0 0 2px var(--md-sys-color-primary-container, var(--md-sys-color-primary)), 0 2px 8px rgba(0,0,0,0.25);
+}
+
+#btn-repeat.repeat-one::after {
+  content: '1';
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 11px;
+  background: var(--md-sys-color-on-primary, #ffffff);
+  color: var(--md-sys-color-primary, #7350e6);
+  border-radius: 50%;
+  width: 11px;
+  height: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 #btn-prev,

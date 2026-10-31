@@ -736,7 +736,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     toolsReady: false,
     isMuted: localStorage.getItem('riff_muted') === '1',
     volume: savedVolume,
-    isRepeat: localStorage.getItem('riff_repeat') === '1',
+    repeatMode: (() => {
+      const mode = localStorage.getItem('raser_repeat_mode') || localStorage.getItem('riff_repeat_mode');
+      if (mode === 'all' || mode === 'one' || mode === 'off') return mode;
+      const legacy = localStorage.getItem('raser_repeat') || localStorage.getItem('riff_repeat');
+      if (legacy === 'all') return 'all';
+      if (legacy === '1') return 'one';
+      return 'off';
+    })(),
+    isRepeat: false,
     isShuffle: localStorage.getItem('riff_shuffle') === '1',
     isAutoRemix: false,
     myWaveActive: false,
@@ -798,6 +806,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                           scrubberDragTargetTime: undefined,
                           riffFont: localStorage.getItem('riff_font') || 'google'
   });
+  state.isRepeat = state.repeatMode !== 'off';
 
   function migrateAddedAt() {
     const favorites = backfillAddedAt(state.favorites, true);
@@ -2962,7 +2971,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (activeTrim.start > 0 && el.nativeAudio.currentTime < activeTrim.start - 0.25) {
             el.nativeAudio.currentTime = activeTrim.start;
           } else if (activeTrim.end > activeTrim.start && el.nativeAudio.currentTime >= activeTrim.end) {
-            if (state.isRepeat) {
+            if (state.repeatMode === 'one') {
               el.nativeAudio.currentTime = activeTrim.start;
               playSmooth();
             } else {
@@ -7842,7 +7851,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function maybePrepareAutoplay() {
-    if (!autoplayEnabled() || state.isRadioQueue || state.isShuffle || state.isRepeat) return;
+    if (!autoplayEnabled() || state.isRadioQueue || state.isShuffle || state.repeatMode !== 'off') return;
     if (!state.currentTrack || !Array.isArray(state.queue) || state.queue.length === 0) return;
     if (state.queueIndex + 1 < state.queue.length) return;
     prepareAutoplay();
@@ -7922,8 +7931,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const eligible = state.queue.map((track, index) => index)
           .filter(index => !isTrackBlocked(state.queue[index]) && !isArtistBlocked(state.queue[index]?.artist));
         if (eligible.length === 0) return;
+        const playedSet = new Set(state.queueHistory);
+        const unplayed = eligible.filter(index => !playedSet.has(index));
+        if (unplayed.length === 0 && state._isNaturalEnding && state.repeatMode === 'off') {
+          if (autoplayEnabled() && await startAutoplay()) return;
+          pauseSmooth();
+          if (el.nativeAudio) el.nativeAudio.currentTime = 0;
+          return;
+        }
         const recent = new Set(state.queueHistory.slice(-Math.max(1, Math.floor(eligible.length / 2))));
-        const pool = eligible.filter(index => !recent.has(index));
+        const pool = unplayed.length ? unplayed : eligible.filter(index => !recent.has(index));
         const candidates = pool.length ? pool : eligible;
         nextIdx = candidates[Math.floor(Math.random() * candidates.length)];
       }
@@ -7945,7 +7962,17 @@ document.addEventListener('DOMContentLoaded', async () => {
           });
           return;
         }
-        nextIdx = 0;
+        if (state.repeatMode === 'all') {
+          nextIdx = 0;
+        } else {
+          if (state._isNaturalEnding) {
+            if (autoplayEnabled() && await startAutoplay()) return;
+            pauseSmooth();
+            if (el.nativeAudio) el.nativeAudio.currentTime = 0;
+            return;
+          }
+          nextIdx = 0;
+        }
       }
       const candidate = state.queue[nextIdx];
       if (candidate && (isTrackBlocked(candidate) || isArtistBlocked(candidate.artist))) {
@@ -8321,7 +8348,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         pauseSmooth();
         return;
       }
-      if (state.isRepeat) {
+      if (state.repeatMode === 'one') {
         el.nativeAudio.currentTime = 0;
         playSmooth();
       } else {
@@ -8391,7 +8418,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (activeTrim.start > 0 && el.nativeAudio.currentTime < activeTrim.start - 0.25) {
             el.nativeAudio.currentTime = activeTrim.start;
           } else if (activeTrim.end > activeTrim.start && el.nativeAudio.currentTime >= activeTrim.end) {
-            if (state.isRepeat) {
+            if (state.repeatMode === 'one') {
               el.nativeAudio.currentTime = activeTrim.start;
               playSmooth();
             } else {
@@ -8407,7 +8434,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const dur = getReliableTrackDuration();
 
       const X = parseInt(localStorage.getItem('riff_crossfade') || '0', 10);
-      if (X > 0 && !crossfadeTriggered && !state.isRepeat && dur > Math.max(X * 3, 30) && (!hlsInstance || dur >= (state.currentTrack?.duration || 0) * 0.9) && cur >= dur - X && (!audioEngine || !audioEngine.isLiveStream(el.nativeAudio))) {
+      if (X > 0 && !crossfadeTriggered && state.repeatMode !== 'one' && dur > Math.max(X * 3, 30) && (!hlsInstance || dur >= (state.currentTrack?.duration || 0) * 0.9) && cur >= dur - X && (!audioEngine || !audioEngine.isLiveStream(el.nativeAudio))) {
         crossfadeTriggered = true;
         crossfadeFadeInPending = true;
         if (audioEngine) audioEngine.fadeOut(X / 2);
@@ -14128,12 +14155,51 @@ function bindCoverHoldZoom(wrapEl) {
     });
   }
 
+  function updateRepeatUI() {
+    if (!el.btnRepeat) return;
+    const mode = state.repeatMode || 'off';
+    el.btnRepeat.classList.toggle('active', mode !== 'off');
+    el.btnRepeat.classList.toggle('repeat-one', mode === 'one');
+
+    const titles = {
+      off: 'Repeat: Off',
+      all: 'Repeat: All',
+      one: 'Repeat: One'
+    };
+    el.btnRepeat.title = titles[mode] || 'Repeat';
+    el.btnRepeat.setAttribute('aria-label', titles[mode] || 'Repeat');
+  }
+
+  function cycleRepeatMode() {
+    const current = state.repeatMode || 'off';
+    let next = 'off';
+    if (current === 'off') next = 'all';
+    else if (current === 'all') next = 'one';
+    else if (current === 'one') next = 'off';
+
+    state.repeatMode = next;
+    state.isRepeat = next !== 'off';
+    localStorage.setItem('raser_repeat_mode', next);
+    localStorage.setItem('riff_repeat_mode', next);
+    localStorage.setItem('raser_repeat', next === 'one' ? '1' : (next === 'all' ? 'all' : '0'));
+    localStorage.setItem('riff_repeat', next === 'one' ? '1' : (next === 'all' ? 'all' : '0'));
+
+    updateRepeatUI();
+
+    const toastMsgs = {
+      off: 'Repeat off',
+      all: 'Repeat all',
+      one: 'Repeat one'
+    };
+    if (typeof showToast === 'function') {
+      showToast(toastMsgs[next] || next);
+    }
+  }
+
   if (el.btnRepeat) {
-    el.btnRepeat.classList.toggle('active', state.isRepeat);
+    updateRepeatUI();
     el.btnRepeat.addEventListener('click', () => {
-      state.isRepeat = !state.isRepeat;
-      localStorage.setItem('riff_repeat', state.isRepeat ? '1' : '0');
-      el.btnRepeat.classList.toggle('active', state.isRepeat);
+      cycleRepeatMode();
     });
   }
 
