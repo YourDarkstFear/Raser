@@ -300,7 +300,7 @@
     return chosen;
   }
 
-  window.RiffShapes = {
+  window.RaserShapes = window.RiffShapes = {
     K: SAMPLE_COUNT,
     HOLD_MS: 2000,
     MORPH_MS: 1250,

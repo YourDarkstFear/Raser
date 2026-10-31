@@ -85,7 +85,7 @@ test('Spotify login reports callback errors and protects account routes', async 
 test('renderer fetch sends the server token to Spotify account routes', async () => {
   const source = fs.readFileSync(path.join(__dirname, '../src/renderer/app.js'), 'utf8');
   const renderer = { electronAPI: { serverToken: getServerToken() }, fetch: fetch.bind(globalThis) };
-  const patchStart = source.indexOf("    if (typeof window === 'undefined' || window.__riffFetchPatched)");
+  const patchStart = source.indexOf('window.__riffFetchPatched');
   const wrapperStart = source.lastIndexOf('(() => {', patchStart);
   const wrapperEnd = source.indexOf('})();', patchStart) + 5;
   assert.ok(wrapperStart >= 0 && wrapperEnd > patchStart);

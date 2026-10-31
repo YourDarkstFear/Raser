@@ -1,5 +1,5 @@
 {
-  description = "Riff - a desktop audio player (Electron)";
+  description = "Raser - a modern desktop audio player (Electron)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -8,9 +8,9 @@
 
   outputs = { self, nixpkgs, flake-utils, ... }:
     let
-      mkRiff = pkgs:
+      mkRaser = pkgs:
         pkgs.buildNpmPackage rec {
-          pname = "riff";
+          pname = "raser";
           version = "1.0.0";
           src = self;
 
@@ -24,16 +24,16 @@
 
           installPhase =
             let
-              appDir = "$out/share/riff";
+              appDir = "$out/share/raser";
               runtimeDeps = pkgs.lib.makeBinPath [ pkgs.yt-dlp pkgs.ffmpeg ];
               desktop = pkgs.makeDesktopItem {
-                name = "Riff";
-                desktopName = "Riff";
+                name = "Raser";
+                desktopName = "Raser";
                 genericName = "Audio Player";
-                exec = "riff";
-                icon = "riff";
+                exec = "raser";
+                icon = "raser";
                 categories = [ "AudioVideo" "Audio" "Player" ];
-                startupWMClass = "riff";
+                startupWMClass = "Raser";
               };
             in
             ''
@@ -43,7 +43,7 @@
               for f in *; do cp -r "$f" ${appDir}/; done
 
               mkdir -p $out/bin
-              makeWrapper ${pkgs.electron}/bin/electron $out/bin/riff \
+              makeWrapper ${pkgs.electron}/bin/electron $out/bin/raser \
                 --add-flags ${appDir} \
                 --prefix PATH : ${runtimeDeps}
 
@@ -51,16 +51,16 @@
               cp ${desktop}/share/applications/*.desktop $out/share/applications/
 
               mkdir -p $out/share/icons/hicolor/256x256/apps
-              cp ${appDir}/assets/icon.png $out/share/icons/hicolor/256x256/apps/riff.png
+              cp ${appDir}/assets/icon.png $out/share/icons/hicolor/256x256/apps/raser.png
 
               runHook postInstall
             '';
 
           meta = with pkgs.lib; {
-            description = "Riff - audio player made for humans";
-            homepage = "https://github.com/rootscripts/riff";
+            description = "Raser - modern desktop music player";
+            homepage = "https://github.com/darkness-38/Raser";
             license = licenses.mit;
-            mainProgram = "riff";
+            mainProgram = "raser";
             platforms = platforms.linux ++ platforms.darwin;
           };
         };
@@ -71,8 +71,9 @@
       in
       {
         packages = {
-          default = mkRiff pkgs;
-          riff = mkRiff pkgs;
+          default = mkRaser pkgs;
+          raser = mkRaser pkgs;
+          riff = mkRaser pkgs;
         };
 
         devShells.default = pkgs.mkShell {
@@ -84,14 +85,15 @@
           ];
 
           shellHook = ''
-            echo "Riff dev shell. Install deps and run with:"
+            echo "Raser dev shell. Install deps and run with:"
             echo "  npm install && npm start"
           '';
         };
       })
     // {
       overlays.default = final: prev: {
-        riff = mkRiff final;
+        raser = mkRaser final;
+        riff = mkRaser final;
       };
     };
 }

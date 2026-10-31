@@ -233,7 +233,7 @@ button:not(.btn-play-pause):not(.nav-item):not(.settings-nav-btn):active, .chip-
   transition: height 220ms cubic-bezier(0.2, 0, 0, 1), opacity 180ms ease;
 }
 .titlebar .app-logo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; -webkit-app-region: no-drag; }
-.titlebar-riff-icon { width: 20px; height: 20px; display: block; background-color: var(--md-sys-color-primary); -webkit-mask: url('../../assets/riff.svg') no-repeat center / contain; mask: url('../../assets/riff.svg') no-repeat center / contain; }
+.titlebar-raser-icon, .titlebar-riff-icon { width: 20px; height: 20px; display: block; background-color: var(--md-sys-color-primary); -webkit-mask: url('../../assets/raser.svg') no-repeat center / contain; mask: url('../../assets/raser.svg') no-repeat center / contain; }
 body.hide-titlebar::before {
   content: "";
   position: fixed;
@@ -9206,14 +9206,14 @@ body.hide-explicit-badges .explicit-badge {
   display: block;
 }
 
-.riff-hero-banner-wrap {
+.raser-hero-banner-wrap, .riff-hero-banner-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
   margin-bottom: 20px;
 }
-.riff-hero-banner {
+.raser-hero-banner, .riff-hero-banner {
   position: relative;
   width: 100%;
   height: 148px;
@@ -9224,13 +9224,13 @@ body.hide-explicit-badges .explicit-badge {
   align-items: center;
   justify-content: center;
 }
-.riff-hero-title {
+.raser-hero-title, .riff-hero-title {
   font-size: calc(24px * var(--font-scale, 1));
   font-weight: 700;
   color: var(--md-sys-color-on-surface);
   letter-spacing: -0.01em;
 }
-.riff-hero-cookie {
+.raser-hero-cookie, .riff-hero-cookie {
   position: relative;
   z-index: 2;
   width: 92px;
@@ -9243,28 +9243,28 @@ body.hide-explicit-badges .explicit-badge {
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   transform: rotate(45deg);
 }
-.riff-hero-logo-main {
+.raser-hero-logo-main, .riff-hero-logo-main {
   width: 46px;
   height: 46px;
   background-color: #36284E;
-  -webkit-mask: url('../../assets/riff.svg') no-repeat center / contain;
-  mask: url('../../assets/riff.svg') no-repeat center / contain;
+  -webkit-mask: url('../../assets/raser.svg') no-repeat center / contain;
+  mask: url('../../assets/raser.svg') no-repeat center / contain;
   transform: rotate(-45deg);
 }
-.riff-hero-floats {
+.raser-hero-floats, .riff-hero-floats {
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 1;
 }
-.riff-float-logo {
+.raser-float-logo, .riff-float-logo {
   position: absolute;
   background-color: #492E7D;
-  -webkit-mask: url('../../assets/riff.svg') no-repeat center / contain;
-  mask: url('../../assets/riff.svg') no-repeat center / contain;
+  -webkit-mask: url('../../assets/raser.svg') no-repeat center / contain;
+  mask: url('../../assets/raser.svg') no-repeat center / contain;
   opacity: 0.85;
 }
-.riff-float-logo.f1 {
+.raser-float-logo.f1, .riff-float-logo.f1 {
   width: 24px;
   height: 24px;
   top: 32%;
@@ -9272,7 +9272,7 @@ body.hide-explicit-badges .explicit-badge {
   transform: translate(calc(var(--px, 0) * 14px), calc(var(--py, 0) * 14px));
   transition: transform 0.45s cubic-bezier(0.2, 0, 0, 1);
 }
-.riff-float-logo.f2 {
+.raser-float-logo.f2, .riff-float-logo.f2 {
   width: 28px;
   height: 28px;
   top: 28%;
@@ -9280,7 +9280,7 @@ body.hide-explicit-badges .explicit-badge {
   transform: translate(calc(var(--px, 0) * -22px), calc(var(--py, 0) * -22px));
   transition: transform 0.45s cubic-bezier(0.2, 0, 0, 1);
 }
-.riff-float-logo.f3 {
+.raser-float-logo.f3, .riff-float-logo.f3 {
   width: 17px;
   height: 17px;
   bottom: 18%;
@@ -9288,7 +9288,7 @@ body.hide-explicit-badges .explicit-badge {
   transform: translate(calc(var(--px, 0) * 9px), calc(var(--py, 0) * 9px));
   transition: transform 0.45s cubic-bezier(0.2, 0, 0, 1);
 }
-body.perf .riff-float-logo {
+body.perf .raser-float-logo, body.perf .riff-float-logo {
   transition: none !important;
 }
 

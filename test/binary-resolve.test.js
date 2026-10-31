@@ -6,8 +6,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'riff-bin-'));
-process.env.RIFF_DATA_DIR = dataDir;
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'raser-bin-'));
+process.env.RASER_DATA_DIR = dataDir;
 process.env.PATH = ['/usr/bin', '/bin', process.env.PATH || ''].join(path.delimiter);
 
 const { resolveBinary, clearBinaryCache } = require('../src/shared/platform');

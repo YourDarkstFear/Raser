@@ -111,14 +111,16 @@ const { getSystemAudioOutputInfo } = require('../shared/audio-output');
 let serverActiveProxy = '';
 
 const _nativeFetch = typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : null;
-function riffFetch(...args) {
-  if (serverActiveProxy && typeof global.riffSessionFetch === 'function') {
-    return global.riffSessionFetch(...args);
+function raserFetch(...args) {
+  const sessionFetch = global.raserSessionFetch || global.riffSessionFetch;
+  if (serverActiveProxy && typeof sessionFetch === 'function') {
+    return sessionFetch(...args);
   }
   return _nativeFetch ? _nativeFetch(...args) : Promise.reject(new Error('fetch not available'));
 }
-globalThis.fetch = riffFetch;
-const fetch = riffFetch;
+const riffFetch = raserFetch;
+globalThis.fetch = raserFetch;
+const fetch = raserFetch;
 
 function stripYoutubeTopic(artist) {
   if (!artist || typeof artist !== 'string') return artist || '';
@@ -1037,7 +1039,7 @@ async function httpGetJson(url, timeoutMs = 6000) {
     try {
       const parsed = new URL(url);
       const mod = parsed.protocol === 'http:' ? http : https;
-      const req = mod.get(url, { family: 4, headers: { 'User-Agent': 'Riff' }, timeout: timeoutMs }, (res) => {
+      const req = mod.get(url, { family: 4, headers: { 'User-Agent': 'Raser' }, timeout: timeoutMs }, (res) => {
         if (res.statusCode < 200 || res.statusCode >= 300) {
           res.resume();
           return resolve(null);
@@ -6734,7 +6736,7 @@ const spotifySafeStorage = process.versions.electron ? require('electron').safeS
 
 function canStoreSpotifyAuth() {
   return spotifySafeStorage?.isEncryptionAvailable() &&
-    (process.platform !== 'linux' || spotifySafeStorage.getSelectedStorageBackend() !== 'basic_text');
+    (process.platform !== 'linux' || typeof spotifySafeStorage.getSelectedStorageBackend !== 'function' || spotifySafeStorage.getSelectedStorageBackend() !== 'basic_text');
 }
 
 function loadSpotifyAuth() {
@@ -6839,7 +6841,7 @@ async function getSpotifyAccessToken(forceRefresh = false) {
       spotifyAuthError = '';
       if (typeof result.data.refresh_token === 'string' && result.data.refresh_token) {
         spotifyAuth.refreshToken = result.data.refresh_token;
-        if (!saveSpotifyAuth()) spotifyAuthError = 'Spotify login could not be saved securely; reconnect after restarting Riff.';
+        if (!saveSpotifyAuth()) spotifyAuthError = 'Spotify login could not be saved securely; reconnect after restarting Raser.';
       }
       return spotifyAuth.token;
     })().finally(() => { spotifyRefreshPromise = null; });
@@ -7577,8 +7579,8 @@ function callLastFmApi(params, secret, method = 'POST') {
       hostname: 'ws.audioscrobbler.com',
       path: reqPath,
       method,
-      headers: isGet ? { 'User-Agent': 'Riff-Desktop-Player/43.0' } : {
-        'User-Agent': 'Riff-Desktop-Player/43.0',
+      headers: isGet ? { 'User-Agent': 'Raser-Desktop-Player/1.0' } : {
+        'User-Agent': 'Raser-Desktop-Player/1.0',
         'Content-Type': 'application/x-www-form-urlencoded',
         'Content-Length': Buffer.byteLength(bodyData)
       },
@@ -7725,7 +7727,7 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname.startsWith('/api/lastfm/')) { handleLastFmRoute(req, res, pathname); return; }
 
-  if (TOKEN_PROTECTED_ROUTES.has(parsedUrl.pathname) && !tokenMatches(req.headers['x-riff-token'])) {
+  if (TOKEN_PROTECTED_ROUTES.has(parsedUrl.pathname) && !tokenMatches(req.headers['x-raser-token'] || req.headers['x-riff-token'])) {
     res.writeHead(403, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ success: false, error: 'forbidden' }));
   }
@@ -8004,7 +8006,7 @@ const server = http.createServer(async (req, res) => {
       spotifyAuthError = errParam === 'access_denied' ? 'Spotify authorization was denied.' : 'Spotify login failed. Check the Client ID, allowed account and redirect URI.';
       spotifyAuth.state = '';
       res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Riff for details.</p></body></html>');
+      return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Raser for details.</p></body></html>');
     }
     const redirectUri = getSpotifyRedirectUri();
     try {
@@ -8012,7 +8014,7 @@ const server = http.createServer(async (req, res) => {
       const tokenResult = await requestSpotifyToken({ grant_type: 'authorization_code', code, redirect_uri: redirectUri, client_id: spotifyAuth.clientId, code_verifier: spotifyAuth.verifier });
       if (spotifyAuth !== session) {
         res.writeHead(409, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end('<!DOCTYPE html><html><body><p>Spotify login session changed. Return to Riff and try again.</p></body></html>');
+        return res.end('<!DOCTYPE html><html><body><p>Spotify login session changed. Return to Raser and try again.</p></body></html>');
       }
       spotifyAuth.state = '';
       if (tokenResult.status >= 200 && tokenResult.status < 300 && typeof tokenResult.data?.access_token === 'string' && tokenResult.data.access_token) {
@@ -8020,20 +8022,20 @@ const server = http.createServer(async (req, res) => {
         spotifyAuth.refreshToken = typeof tokenResult.data.refresh_token === 'string' ? tokenResult.data.refresh_token : '';
         spotifyAuth.expiresAt = Date.now() + (Number.isFinite(tokenResult.data.expires_in) && tokenResult.data.expires_in > 0 ? tokenResult.data.expires_in : 3600) * 1000;
         if (!spotifyAuth.refreshToken) spotifyAuthError = 'Spotify did not provide a refresh token; reconnect when this session expires.';
-        else if (!saveSpotifyAuth()) spotifyAuthError = 'Spotify login could not be saved securely; reconnect after restarting Riff.';
+        else if (!saveSpotifyAuth()) spotifyAuthError = 'Spotify login could not be saved securely; reconnect after restarting Raser.';
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end('<!DOCTYPE html><html><body><p>Riff is connected to Spotify. You can close this tab.</p></body></html>');
+        return res.end('<!DOCTYPE html><html><body><p>Raser is connected to Spotify. You can close this tab.</p></body></html>');
       } else {
         const reason = tokenResult.data?.error_description || tokenResult.data?.error || `HTTP ${tokenResult.status}`;
         spotifyAuthError = `Spotify token exchange failed: ${reason}`;
         res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Riff for details.</p></body></html>');
+        return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Raser for details.</p></body></html>');
       }
     } catch (err) {
       spotifyAuth.state = '';
       spotifyAuthError = `Could not reach Spotify: ${err.message}`;
       res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Riff for details.</p></body></html>');
+      return res.end('<!DOCTYPE html><html><body><p>Spotify login failed. Return to Raser for details.</p></body></html>');
     }
   }
 
@@ -8483,7 +8485,7 @@ const server = http.createServer(async (req, res) => {
   res.end('Not found');
 });
 
-// Lets `riff lyrics` find the server when it is not on the default port.
+// Lets `raser lyrics` (or legacy `riff lyrics`) find the server when it is not on the default port.
 const PORT_FILE = path.join(DATA_DIR, 'server-port');
 function writePortFile(p) {
   try { fs.writeFileSync(PORT_FILE, String(p)); } catch (_) {}

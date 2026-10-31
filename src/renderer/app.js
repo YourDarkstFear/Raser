@@ -33,7 +33,7 @@ migrated = true;
 }
 
 try { origClear.call(window.localStorage); } catch (_) {}
-window.__RIFF_STORAGE_MAP__ = diskMap;
+window.__RASER_STORAGE_MAP__ = window.__RIFF_STORAGE_MAP__ = diskMap;
 
 if (migrated) {
 window.electronAPI.storageSaveSync(diskMap);
@@ -46,7 +46,15 @@ window.electronAPI.storageSaveBatch(diskMap);
 Storage.prototype.getItem = function(key) {
 if (this === window.localStorage) {
 const k = String(key);
-return Object.prototype.hasOwnProperty.call(diskMap, k) ? diskMap[k] : null;
+if (Object.prototype.hasOwnProperty.call(diskMap, k)) return diskMap[k];
+if (k.startsWith('raser_')) {
+  const legacyK = 'riff_' + k.slice(6);
+  if (Object.prototype.hasOwnProperty.call(diskMap, legacyK)) return diskMap[legacyK];
+} else if (k.startsWith('riff_')) {
+  const newK = 'raser_' + k.slice(5);
+  if (Object.prototype.hasOwnProperty.call(diskMap, newK)) return diskMap[newK];
+}
+return null;
 }
 return origGet.call(this, key);
 };
@@ -57,6 +65,11 @@ const k = String(key);
 const v = String(val);
 if (diskMap[k] === v) return;
 diskMap[k] = v;
+if (k.startsWith('raser_')) {
+  diskMap['riff_' + k.slice(6)] = v;
+} else if (k.startsWith('riff_')) {
+  diskMap['raser_' + k.slice(5)] = v;
+}
 flushAsync();
 return;
 }
@@ -66,10 +79,17 @@ origSet.call(this, key, val);
 Storage.prototype.removeItem = function(key) {
 if (this === window.localStorage) {
 const k = String(key);
+let changed = false;
 if (Object.prototype.hasOwnProperty.call(diskMap, k)) {
-delete diskMap[k];
-flushAsync();
+  delete diskMap[k];
+  changed = true;
 }
+const altK = k.startsWith('raser_') ? 'riff_' + k.slice(6) : (k.startsWith('riff_') ? 'raser_' + k.slice(5) : null);
+if (altK && Object.prototype.hasOwnProperty.call(diskMap, altK)) {
+  delete diskMap[altK];
+  changed = true;
+}
+if (changed) flushAsync();
 return;
 }
 origRemove.call(this, key);
@@ -78,7 +98,7 @@ origRemove.call(this, key);
 Storage.prototype.clear = function() {
 if (this === window.localStorage) {
 diskMap = {};
-window.__RIFF_STORAGE_MAP__ = diskMap;
+window.__RASER_STORAGE_MAP__ = window.__RIFF_STORAGE_MAP__ = diskMap;
 flushAsync();
 return;
 }
@@ -110,19 +130,20 @@ try { window.electronAPI.storageSaveSync(diskMap); } catch (_) {}
 
 (() => {
   try {
-    if (typeof window === 'undefined' || window.__riffFetchPatched) return;
+    if (typeof window === 'undefined' || window.__raserFetchPatched || window.__riffFetchPatched) return;
     const api = window.electronAPI;
     const token = api && api.serverToken;
     if (!token) return;
     const origFetch = window.fetch ? window.fetch.bind(window) : null;
     if (!origFetch) return;
-    window.__riffFetchPatched = true;
+    window.__raserFetchPatched = window.__riffFetchPatched = true;
     window.fetch = function (input, init) {
       try {
         const raw = typeof input === 'string' ? input : (input && input.url) || '';
         if (raw.indexOf('/api/') !== -1) {
           const opts = Object.assign({}, init || {});
           const headers = new Headers(opts.headers || (input && input.headers) || undefined);
+          headers.set('X-Raser-Token', token);
           headers.set('X-Riff-Token', token);
           opts.headers = headers;
           return origFetch(input, opts);
@@ -173,7 +194,7 @@ try { window.electronAPI.storageSaveSync(diskMap); } catch (_) {}
   };
   const safety = setTimeout(finish, 1850);
   try {
-    const res = await fetch('../../assets/riff.svg');
+    const res = await fetch('../../assets/raser.svg').catch(() => fetch('../../assets/riff.svg'));
     const svgText = await res.text();
     host.innerHTML = svgText;
     const svg = host.querySelector('svg');
@@ -17085,18 +17106,18 @@ function bindCoverHoldZoom(wrapEl) {
   let appCssCache = null;
 
   function applyCustomStyles() {
-    document.querySelectorAll('style[data-riff-custom]').forEach((n) => n.remove());
+    document.querySelectorAll('style[data-raser-custom], style[data-riff-custom]').forEach((n) => n.remove());
     customThemes.filter((t) => t.enabled).forEach((t) => {
       const s = document.createElement('style');
-      s.dataset.riffCustom = 'theme';
+      s.dataset.raserCustom = s.dataset.riffCustom = 'theme';
       s.dataset.themeId = t.id;
       s.textContent = t.css;
       document.head.appendChild(s);
     });
-    const userCss = localStorage.getItem('riff_custom_css') || '';
+    const userCss = localStorage.getItem('raser_custom_css') || localStorage.getItem('riff_custom_css') || '';
     if (userCss.trim()) {
       const s = document.createElement('style');
-      s.dataset.riffCustom = 'user';
+      s.dataset.raserCustom = s.dataset.riffCustom = 'user';
       s.textContent = userCss;
       document.head.appendChild(s);
     }
@@ -17318,8 +17339,8 @@ function bindCoverHoldZoom(wrapEl) {
     if (loadedPlugins.has(p.file)) return;
     try {
       const api = createPluginApi(p);
-      const fn = new Function('Riff', 'plugin', `${p.code}\n//# sourceURL=riff-plugin-${p.file}`);
-      const result = fn(api, api.plugin);
+      const fn = new Function('Riff', 'plugin', 'Raser', `${p.code}\n//# sourceURL=raser-plugin-${p.file}`);
+      const result = fn(api, api.plugin, api);
       loadedPlugins.set(p.file, { stop: result && typeof result.stop === 'function' ? result.stop : null });
     } catch (e) { reportPluginError(p.file, e); }
   }
@@ -17331,7 +17352,7 @@ function bindCoverHoldZoom(wrapEl) {
     document.querySelectorAll(`style[data-plugin="${p.file}"]`).forEach((n) => n.remove());
     const hadStop = !!(entry && entry.stop);
     loadedPlugins.delete(p.file);
-    if (!silent && !hadStop) showToast(`Restart Riff to fully unload "${p.name}"`, 'info');
+    if (!silent && !hadStop) showToast(`Restart Raser to fully unload "${p.name}"`, 'info');
   }
   let pluginsCache = [];
   function renderPluginCards() {
@@ -17426,8 +17447,10 @@ function bindCoverHoldZoom(wrapEl) {
     const high = hex('--md-sys-color-surface-container-high-solid', '#2b2930');
     const primary = hex('--md-sys-color-primary', '#d0bcff');
     const lum = (h) => { const n = parseInt(h.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
-    monaco.editor.defineTheme('riff', { base: lum(bg) < 0.5 ? 'vs-dark' : 'vs', inherit: true, rules: [], colors: { 'editor.background': bg, 'editorGutter.background': bg, 'minimap.background': bg, 'editor.lineHighlightBackground': high, 'editorCursor.foreground': primary, 'editor.selectionBackground': primary + '55' } });
-    monaco.editor.setTheme('riff');
+    const themeDef = { base: lum(bg) < 0.5 ? 'vs-dark' : 'vs', inherit: true, rules: [], colors: { 'editor.background': bg, 'editorGutter.background': bg, 'minimap.background': bg, 'editor.lineHighlightBackground': high, 'editorCursor.foreground': primary, 'editor.selectionBackground': primary + '55' } };
+    monaco.editor.defineTheme('raser', themeDef);
+    monaco.editor.defineTheme('riff', themeDef);
+    monaco.editor.setTheme('raser');
   }
 
   async function openCssEditor() {
@@ -21327,7 +21350,7 @@ function bindCoverHoldZoom(wrapEl) {
   }
 
   async function exportAllPlaylists() {
-    await exportPlaylistsAsJson(state.playlists, 'riff-playlists.json');
+    await exportPlaylistsAsJson(state.playlists, 'raser-playlists.json');
   }
 
   const btnExportPl = document.getElementById('btn-export-playlist');
@@ -24765,25 +24788,28 @@ function bindCoverHoldZoom(wrapEl) {
   }
 
   function applyHomeLayout() {
-    const sp = (localStorage.getItem('riff_home_layout') || 'spotify') === 'spotify';
+    const layout = localStorage.getItem('raser_home_layout') || localStorage.getItem('riff_home_layout') || 'spotify';
+    const sp = layout === 'spotify';
     document.body.classList.toggle('home-spotify', sp);
     const btnSp = document.getElementById('home-layout-spotify');
-    const btnRiff = document.getElementById('home-layout-riff');
+    const btnRiff = document.getElementById('home-layout-raser') || document.getElementById('home-layout-riff');
     if (btnSp) btnSp.classList.toggle('active', sp);
     if (btnRiff) btnRiff.classList.toggle('active', !sp);
     if (sp) renderSpotifyHome();
   }
 
   const btnHomeSpotify = document.getElementById('home-layout-spotify');
-  const btnHomeRiff = document.getElementById('home-layout-riff');
+  const btnHomeRiff = document.getElementById('home-layout-raser') || document.getElementById('home-layout-riff');
   if (btnHomeSpotify) {
     btnHomeSpotify.addEventListener('click', () => {
+      localStorage.setItem('raser_home_layout', 'spotify');
       localStorage.setItem('riff_home_layout', 'spotify');
       applyHomeLayout();
     });
   }
   if (btnHomeRiff) {
     btnHomeRiff.addEventListener('click', () => {
+      localStorage.setItem('raser_home_layout', 'raser');
       localStorage.setItem('riff_home_layout', 'riff');
       applyHomeLayout();
     });

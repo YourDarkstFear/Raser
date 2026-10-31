@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "src/main/main.js",
   "bin": {
-    "raser": "src/main/cli.js"
+    "raser": "src/main/cli.js",
+    "riff": "src/main/cli.js"
   },
   "scripts": {
     "start": "electron .",

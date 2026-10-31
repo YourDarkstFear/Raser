@@ -11,7 +11,7 @@ if (!Riff.shuffle || !Riff.queue || !Riff.api || !Riff.library) {
 
 const MODES = ['classic', 'spotify', 'smart'];
 const NAMES = {
-  classic: 'Classic shuffle (Riff default)',
+  classic: 'Classic shuffle (default)',
   spotify: 'Spotify-style shuffle',
   smart: 'Smart shuffle'
 };

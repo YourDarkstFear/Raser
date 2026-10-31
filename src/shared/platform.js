@@ -15,16 +15,32 @@ if (process.platform === 'darwin') {
   process.env.PATH = parts.join(':');
 }
 
-const DEFAULT_DATA_DIR = IS_WIN
-  ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Riff')
-  : process.platform === 'darwin'
-  ? path.join(os.homedir(), 'Library', 'Application Support', 'Riff')
+function resolveDataPath(baseWin, baseMac) {
+  if (IS_WIN) {
+    const raserPath = path.join(baseWin, 'Raser');
+    const riffPath = path.join(baseWin, 'Riff');
+    return fs.existsSync(raserPath) || !fs.existsSync(riffPath) ? raserPath : riffPath;
+  }
+  if (process.platform === 'darwin') {
+    const raserPath = path.join(baseMac, 'Raser');
+    const riffPath = path.join(baseMac, 'Riff');
+    return fs.existsSync(raserPath) || !fs.existsSync(riffPath) ? raserPath : riffPath;
+  }
+  return null;
+}
+
+const DEFAULT_DATA_DIR = IS_WIN || process.platform === 'darwin'
+  ? resolveDataPath(
+      process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'),
+      path.join(os.homedir(), 'Library', 'Application Support')
+    )
   : path.join(os.homedir(), '.cache', 'devsize');
 
-const CONFIG_DIR = IS_WIN
-  ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Riff')
-  : process.platform === 'darwin'
-  ? path.join(os.homedir(), 'Library', 'Application Support', 'Riff')
+const CONFIG_DIR = IS_WIN || process.platform === 'darwin'
+  ? resolveDataPath(
+      process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'),
+      path.join(os.homedir(), 'Library', 'Application Support')
+    )
   : path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'devsize');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 
@@ -38,7 +54,7 @@ function readConfig() {
 }
 
 function resolveDataDir() {
-  const override = process.env.RIFF_DATA_DIR;
+  const override = process.env.RASER_DATA_DIR || process.env.RIFF_DATA_DIR;
   if (override && override.trim()) {
     try { return path.resolve(override.trim()); } catch (e) {}
   }
@@ -96,8 +112,10 @@ const METADATA_PATH = path.join(DATA_DIR, 'metadata.json');
 const LIBRARY_DIR = path.join(DATA_DIR, 'library');
 const LIBRARY_PATH = path.join(DATA_DIR, 'library.json');
 const BIN_DIR = path.join(DATA_DIR, 'bin');
-const TUTORIAL_MARKER = IS_WIN ? 'C:\\Riff\\.rifftutorial' : path.join(os.homedir(), '.rifftutorial');
-const TUTORIAL_MARKER_FALLBACK = path.join(DATA_DIR, '.rifftutorial');
+const TUTORIAL_MARKER = IS_WIN ? 'C:\\Raser\\.rasertutorial' : path.join(os.homedir(), '.rasertutorial');
+const TUTORIAL_MARKER_FALLBACK = path.join(DATA_DIR, '.rasertutorial');
+const TUTORIAL_LEGACY_MARKER = IS_WIN ? 'C:\\Riff\\.rifftutorial' : path.join(os.homedir(), '.rifftutorial');
+const TUTORIAL_LEGACY_FALLBACK = path.join(DATA_DIR, '.rifftutorial');
 const STARTUP_PATH = path.join(DATA_DIR, 'startup.json');
 function readStartupConfig() { try { return JSON.parse(fs.readFileSync(STARTUP_PATH, 'utf8')) || {}; } catch (e) { return {}; } }
 function writeStartupConfig(patch) {
@@ -109,7 +127,7 @@ function writeStartupConfig(patch) {
 }
 const APP_VERSION = (() => { try { return require('../../package.json').version || '0'; } catch (e) { return '0'; } })();
 function tutorialDone() {
-  for (const file of [TUTORIAL_MARKER, TUTORIAL_MARKER_FALLBACK]) {
+  for (const file of [TUTORIAL_MARKER, TUTORIAL_MARKER_FALLBACK, TUTORIAL_LEGACY_MARKER, TUTORIAL_LEGACY_FALLBACK]) {
     try {
       if (!fs.existsSync(file)) continue;
       if (fs.readFileSync(file, 'utf8').trim() === APP_VERSION) return true;
@@ -118,10 +136,10 @@ function tutorialDone() {
   return false;
 }
 function markTutorialDone() {
-  for (const file of [TUTORIAL_MARKER, TUTORIAL_MARKER_FALLBACK]) {
-    try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, APP_VERSION); return true; } catch (e) {}
+  for (const file of [TUTORIAL_MARKER, TUTORIAL_MARKER_FALLBACK, TUTORIAL_LEGACY_MARKER, TUTORIAL_LEGACY_FALLBACK]) {
+    try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, APP_VERSION); } catch (e) {}
   }
-  return false;
+  return true;
 }
 
 async function copyDirContents(fromDir, toDir, skipNames = new Set(['config.json'])) {
@@ -150,19 +168,20 @@ async function removeDirContents(dir, skipNames = new Set(['config.json'])) {
   }
 }
 
-// Top-level entries Riff owns inside the data dir. Moving the data dir only
+// Top-level entries Raser owns inside the data dir. Moving the data dir only
 // touches these: on macOS the default data dir is also Electron's userData
 // (Local Storage, cookies, storage.json...), and a custom data dir may hold
 // unrelated user files, so neither may be copied around or deleted wholesale.
-const RIFF_DATA_ENTRIES = [
+const RASER_DATA_ENTRIES = [
   'tracks', 'custom-lyrics', 'lyrics', 'thumbnails', 'library', 'bin', 'plugins', 'themes', 'logs', 'i18n',
   'metadata.json', 'library.json', 'startup.json', 'yt-cookies.txt', 'google-oauth.enc', 'spotify-auth.enc',
-  '.yt-logged-out', '.rifftutorial'
+  '.yt-logged-out', '.rasertutorial', '.rifftutorial'
 ];
+const RIFF_DATA_ENTRIES = RASER_DATA_ENTRIES;
 
 async function copyDataEntries(fromDir, toDir) {
   await fs.promises.mkdir(toDir, { recursive: true });
-  for (const name of RIFF_DATA_ENTRIES) {
+  for (const name of RASER_DATA_ENTRIES) {
     const src = path.join(fromDir, name);
     let st;
     try { st = await fs.promises.stat(src); } catch (e) { continue; }
@@ -173,7 +192,7 @@ async function copyDataEntries(fromDir, toDir) {
 }
 
 async function removeDataEntries(dir) {
-  for (const name of RIFF_DATA_ENTRIES) {
+  for (const name of RASER_DATA_ENTRIES) {
     try { await fs.promises.rm(path.join(dir, name), { recursive: true, force: true }); } catch (e) {}
   }
 }
@@ -213,9 +232,11 @@ function resolveBinary(name) {
     delete binaryCache[name];
   }
   const exe = IS_WIN ? `${name}.exe` : name;
-  const envKey = `RIFF_${name.replace(/[^a-z0-9]/gi, '').toUpperCase()}`;
+  const normName = name.replace(/[^a-z0-9]/gi, '').toUpperCase();
+  const envKey = `RASER_${normName}`;
+  const legacyEnvKey = `RIFF_${normName}`;
   const candidates = [
-    process.env[envKey],
+    process.env[envKey] || process.env[legacyEnvKey],
     path.join(BIN_DIR, exe),
     process.resourcesPath && path.join(process.resourcesPath, 'bin', exe),
     path.join(__dirname, '../../bin', exe)
@@ -286,5 +307,5 @@ module.exports = {
   tutorialDone, markTutorialDone,
   readStartupConfig, writeStartupConfig,
   readConfig, resolveDataDir, setDataDir, resolveDownloadDir, defaultDownloadDir, setDownloadDir, copyDirContents, removeDirContents,
-  RIFF_DATA_ENTRIES, copyDataEntries, removeDataEntries
+  RASER_DATA_ENTRIES, RIFF_DATA_ENTRIES, copyDataEntries, removeDataEntries
 };

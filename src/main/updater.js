@@ -31,7 +31,7 @@ function initUpdater(getWindow) {
   if (pkg.version) {
     app.setVersion(pkg.version);
   }
-  const releasesUrl = `${pkg.homepage || 'https://github.com/rootscripts/riff'}/releases`;
+  const releasesUrl = `${pkg.homepage || 'https://github.com/darkness-38/Raser'}/releases`;
   let manualCheck = false;
   let installNow = false;
   let current = null;
@@ -50,8 +50,8 @@ function initUpdater(getWindow) {
 
   const checkViaGithubApi = async () => {
     try {
-      const res = await fetch('https://api.github.com/repos/rootscripts/riff/releases/latest', {
-        headers: { 'User-Agent': 'Riff-Player' }
+      const res = await fetch('https://api.github.com/repos/darkness-38/Raser/releases/latest', {
+        headers: { 'User-Agent': 'Raser-Player' }
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const json = await res.json();
@@ -108,8 +108,8 @@ function initUpdater(getWindow) {
         let htmlUrl = `${releasesUrl}/tag/v${info.version}`;
 
         try {
-          const res = await fetch('https://api.github.com/repos/rootscripts/riff/releases/latest', {
-            headers: { 'User-Agent': 'Riff-Player' }
+          const res = await fetch('https://api.github.com/repos/darkness-38/Raser/releases/latest', {
+            headers: { 'User-Agent': 'Raser-Player' }
           });
           if (res.ok) {
             const json = await res.json();

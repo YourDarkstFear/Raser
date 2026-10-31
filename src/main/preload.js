@@ -3,8 +3,10 @@ const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   serverToken: (() => {
-    const arg = process.argv.find((a) => a.startsWith('--riff-token='));
-    return arg ? arg.slice('--riff-token='.length) : '';
+    const raserArg = process.argv.find((a) => a.startsWith('--raser-token='));
+    if (raserArg) return raserArg.slice('--raser-token='.length);
+    const riffArg = process.argv.find((a) => a.startsWith('--riff-token='));
+    return riffArg ? riffArg.slice('--riff-token='.length) : '';
   })(),
   minimizeWindow: () => ipcRenderer.send('window-minimize'),
   maximizeWindow: () => ipcRenderer.send('window-maximize'),

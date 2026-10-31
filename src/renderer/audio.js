@@ -835,6 +835,6 @@
     }
   }
 
-  global.RiffAudioEngine = RiffAudioEngine;
+  global.RaserAudioEngine = global.RiffAudioEngine = RiffAudioEngine;
 
 })(typeof window !== 'undefined' ? window : globalThis);

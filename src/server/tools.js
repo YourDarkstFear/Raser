@@ -27,7 +27,7 @@ function ffmpegAsset() {
 function get(url, redirects = 6, extraHeaders = {}) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, {
-      headers: Object.assign({ 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Riff/43.1' }, extraHeaders),
+      headers: Object.assign({ 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Raser/1.0' }, extraHeaders),
       timeout: 25000
     }, (res) => {
       if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location && redirects > 0) {
@@ -170,10 +170,10 @@ async function installFfmpeg() {
   const sums = await getText(`${base}/checksums.sha256`);
   const want = expectedHash(sums, asset.name);
   if (!want) throw new Error(`No checksum published for ${asset.name}`);
-  const archive = path.join(os.tmpdir(), `riff-${asset.name}`);
+  const archive = path.join(os.tmpdir(), `raser-${asset.name}`);
   const got = await downloadFile(`${base}/${asset.name}`, archive);
   if (got !== want) { fs.rmSync(archive, { force: true }); throw new Error('ffmpeg checksum mismatch'); }
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'riff-ffmpeg-'));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'raser-ffmpeg-'));
   try {
     if (IS_WIN) {
       try {
@@ -214,7 +214,7 @@ async function installFfmpeg() {
 async function installFfmpegMac() {
   const failures = [];
   for (const name of ['ffmpeg', 'ffprobe']) {
-    const archive = path.join(os.tmpdir(), `riff-${name}-macos.zip`);
+    const archive = path.join(os.tmpdir(), `raser-${name}-macos.zip`);
     const dest = path.join(BIN_DIR, name);
     try {
       await downloadFile(`https://evermeet.cx/ffmpeg/getrelease/${name}/zip`, archive);

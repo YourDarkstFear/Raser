@@ -3,7 +3,8 @@ const path = require('path');
 const { DATA_DIR } = require('./platform');
 
 const LOG_DIR = path.join(DATA_DIR, 'logs');
-const LOG_PATH = path.join(LOG_DIR, 'riff.log');
+const LOG_PATH = path.join(LOG_DIR, 'raser.log');
+const LEGACY_LOG_PATH = path.join(LOG_DIR, 'riff.log');
 const MAX_BYTES = 1024 * 1024;
 
 function rotate() {
@@ -21,7 +22,12 @@ function log(level, message) {
 }
 
 function tail(lines) {
-  try { return fs.readFileSync(LOG_PATH, 'utf8').split('\n').filter(Boolean).slice(-lines); } catch (e) { return []; }
+  try {
+    const file = fs.existsSync(LOG_PATH) ? LOG_PATH : LEGACY_LOG_PATH;
+    return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).slice(-lines);
+  } catch (e) {
+    return [];
+  }
 }
 
 module.exports = { log, tail, LOG_DIR };

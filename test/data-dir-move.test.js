@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-process.env.RIFF_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'riff-data-'));
+process.env.RASER_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'raser-data-'));
 
 const { copyDataEntries, removeDataEntries } = require('../src/shared/platform');
 
@@ -15,9 +15,9 @@ function write(file, content = 'x') {
   fs.writeFileSync(file, content);
 }
 
-test('moving the data dir only touches Riff entries', async () => {
-  const from = fs.mkdtempSync(path.join(os.tmpdir(), 'riff-from-'));
-  const to = fs.mkdtempSync(path.join(os.tmpdir(), 'riff-to-'));
+test('moving the data dir only touches Raser entries', async () => {
+  const from = fs.mkdtempSync(path.join(os.tmpdir(), 'raser-from-'));
+  const to = fs.mkdtempSync(path.join(os.tmpdir(), 'raser-to-'));
 
   // Riff data
   write(path.join(from, 'tracks', 'abc.opus'), 'audio');

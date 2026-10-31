@@ -17,7 +17,9 @@ const {
   refreshAccessToken
 } = require('./google-oauth');
 const { fetchYouTubeLibrary } = require('./youtube-data');
-const RFACC_KEY = crypto.createHash('sha256').update('riff-account-key-v1').digest();
+const RFACC_KEY_V2 = crypto.createHash('sha256').update('raser-account-key-v1').digest();
+const RFACC_KEY_V1 = crypto.createHash('sha256').update('riff-account-key-v1').digest();
+const RFACC_KEY = RFACC_KEY_V2;
 const APP_ID = 'io.github.darkness38.raser';
 const IS_MAC = process.platform === 'darwin';
 
@@ -28,7 +30,7 @@ function encryptAccount(dataObj) {
   const jsonStr = typeof dataObj === 'string' ? dataObj : JSON.stringify(dataObj);
   const compressed = zlib.deflateRawSync(Buffer.from(jsonStr, 'utf8'));
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', RFACC_KEY, iv);
+  const cipher = crypto.createCipheriv('aes-256-gcm', RFACC_KEY_V2, iv);
   const encrypted = Buffer.concat([cipher.update(compressed), cipher.final()]);
   const tag = cipher.getAuthTag();
   const header = Buffer.from('RFAC');
@@ -41,11 +43,16 @@ function decryptAccount(buffer) {
   const iv = buffer.subarray(4, 16);
   const tag = buffer.subarray(16, 32);
   const encrypted = buffer.subarray(32);
-  const decipher = crypto.createDecipheriv('aes-256-gcm', RFACC_KEY, iv);
-  decipher.setAuthTag(tag);
-  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-  const decompressed = zlib.inflateRawSync(decrypted);
-  return JSON.parse(decompressed.toString('utf8'));
+  for (const key of [RFACC_KEY_V2, RFACC_KEY_V1]) {
+    try {
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+      decipher.setAuthTag(tag);
+      const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+      const decompressed = zlib.inflateRawSync(decrypted);
+      return JSON.parse(decompressed.toString('utf8'));
+    } catch (_) {}
+  }
+  throw new Error('Failed to decrypt account file');
 }
 const { LIBRARY_DIR, DATA_DIR, resolveBinary, tutorialDone, markTutorialDone, readStartupConfig, writeStartupConfig, cookieJarHasYtLogin } = require('../shared/platform');
 const { getLauncherInfo, installLauncher } = require('./launcher');
@@ -69,7 +76,7 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
   app.commandLine.appendSwitch('disable-features', 'Vulkan,AudioServiceOutOfProcess');
 
-  if (process.env.RIFF_SKIP_GPU_BUFFER_FLAGS !== '1') {
+  if (process.env.RASER_SKIP_GPU_BUFFER_FLAGS !== '1' && process.env.RIFF_SKIP_GPU_BUFFER_FLAGS !== '1') {
     app.commandLine.appendSwitch('disable-gpu-memory-buffer-video-frames');
     app.commandLine.appendSwitch('disable-gpu-memory-buffer-compositor-resources');
   }
@@ -102,18 +109,20 @@ app.commandLine.appendSwitch('disk-cache-size', '52428800');
 app.commandLine.appendSwitch('media-cache-size', '52428800');
 
 app.on('ready', () => {
-  const cleanUA = (app.userAgentFallback || '').replace(/\s*Electron\/[^\s]+/gi, '').replace(/\s*riff\/[^\s]+/gi, '');
+  const cleanUA = (app.userAgentFallback || '')
+    .replace(/\s*Electron\/[^\s]+/gi, '')
+    .replace(/\s*(?:raser|riff)\/[^\s]+/gi, '');
   if (cleanUA) app.userAgentFallback = cleanUA;
 });
 
-const extraFlags = (process.env.RIFF_FLAGS || '').split(';').map((s) => s.trim()).filter(Boolean);
+const extraFlags = ((process.env.RASER_FLAGS || process.env.RIFF_FLAGS) || '').split(';').map((s) => s.trim()).filter(Boolean);
 for (const flag of extraFlags) {
   const eq = flag.indexOf('=');
   if (eq > 0) app.commandLine.appendSwitch(flag.slice(0, eq), flag.slice(eq + 1));
   else app.commandLine.appendSwitch(flag);
 }
 
-if (process.env.RIFF_DEBUG === '1') {
+if (process.env.RASER_DEBUG === '1' || process.env.RIFF_DEBUG === '1') {
   app.whenReady().then(async () => {
     console.log('[gpu] features', JSON.stringify(app.getGPUFeatureStatus()));
     try {
@@ -222,7 +231,7 @@ function runGUI() {
         }
       }
     } catch (e) {
-      console.warn('[riff] storage.json read warning:', e.message);
+      console.warn('[raser] storage.json read warning:', e.message);
     }
     return null;
   }
@@ -410,7 +419,7 @@ function runGUI() {
                                    useContentSize: true,
                                    webPreferences: {
                                      preload: path.join(__dirname, 'preload.js'),
-                                   additionalArguments: [`--riff-token=${getServerToken()}`],
+                                   additionalArguments: [`--raser-token=${getServerToken()}`, `--riff-token=${getServerToken()}`],
                                    nodeIntegration: false,
                                    contextIsolation: true,
                                    webSecurity: false,
@@ -558,7 +567,7 @@ function runGUI() {
     });
 
     ipcMain.handle('get-diagnostics', async () => {
-      const lines = [`Riff ${app.getVersion()}`, `OS ${process.platform} ${process.arch} ${os.release()}`, `Electron ${process.versions.electron} Chromium ${process.versions.chrome} Node ${process.versions.node}`, `Locale ${app.getLocale()}`, `Data ${DATA_DIR}`];
+      const lines = [`Raser ${app.getVersion()}`, `OS ${process.platform} ${process.arch} ${os.release()}`, `Electron ${process.versions.electron} Chromium ${process.versions.chrome} Node ${process.versions.node}`, `Locale ${app.getLocale()}`, `Data ${DATA_DIR}`];
       for (const name of ['yt-dlp', 'ffmpeg']) {
         const bin = resolveBinary(name);
         lines.push(`${name}: ${bin || 'NOT FOUND'}`);
@@ -576,8 +585,10 @@ function runGUI() {
             ? { proxyRules: clean, proxyBypassRules: '<local>,127.0.0.1,localhost' }
             : { mode: 'direct' };
           await session.defaultSession.setProxy(config);
-          const googleSess = session.fromPartition('persist:riff-google');
-          if (googleSess) await googleSess.setProxy(config);
+          for (const p of ['persist:raser-google', 'persist:riff-google']) {
+            const googleSess = session.fromPartition(p);
+            if (googleSess) await googleSess.setProxy(config);
+          }
           return { success: true };
         } catch (e) {
           return { success: false, error: e.message };
@@ -1212,7 +1223,7 @@ function runGUI() {
       let mediaKeysWanted = true;
       let mediaKeysActive = false;
       const sendMedia = (cmd) => {
-        if (process.env.RIFF_DEBUG === '1') console.log('[media] globalShortcut', cmd);
+        if (process.env.RASER_DEBUG === '1' || process.env.RIFF_DEBUG === '1') console.log('[media] globalShortcut', cmd);
         if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('media-command', cmd);
       };
       function unregisterMediaKeys() {
@@ -1328,9 +1339,9 @@ function runGUI() {
         try {
           const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
           const r = await dialog.showSaveDialog(win, {
-            title: 'Export Riff account',
-            defaultPath: 'riff-account.rfacc',
-            filters: [{ name: 'Riff Account (.rfacc)', extensions: ['rfacc'] }]
+            title: 'Export Raser account',
+            defaultPath: 'raser-account.rfacc',
+            filters: [{ name: 'Raser Account (.rfacc)', extensions: ['rfacc'] }]
           });
           if (r.canceled || !r.filePath) return { canceled: true };
           const buffer = encryptAccount(payload || {});
@@ -1345,9 +1356,9 @@ function runGUI() {
         try {
           const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
           const r = await dialog.showOpenDialog(win, {
-            title: 'Import Riff account',
+            title: 'Import Raser account',
             properties: ['openFile'],
-            filters: [{ name: 'Riff Account (.rfacc)', extensions: ['rfacc'] }]
+            filters: [{ name: 'Raser Account (.rfacc)', extensions: ['rfacc'] }, { name: 'All Files', extensions: ['*'] }]
           });
           if (r.canceled || !r.filePaths || !r.filePaths.length) return { canceled: true };
           const buffer = await fs.promises.readFile(r.filePaths[0]);
@@ -1391,7 +1402,7 @@ function runGUI() {
         if (youtubeCookieImportPromise) return youtubeCookieImportPromise;
         youtubeCookieImportPromise = (async () => {
           const txt = fs.readFileSync(YT_COOKIES_FILE, 'utf8');
-          const googleSession = session.fromPartition('persist:riff-google');
+          const googleSession = session.fromPartition('persist:raser-google');
           await googleSession.clearStorageData({ storages: ['cookies'] });
           const rows = txt.split(/\r?\n/);
           for (const row of rows) {
@@ -1437,7 +1448,7 @@ function runGUI() {
       }
 
       async function saveYoutubePlaybackCookies() {
-        const googleSession = session.fromPartition('persist:riff-google');
+        const googleSession = session.fromPartition('persist:raser-google');
         const cookies = await googleSession.cookies.get({});
         const youtubeCookies = cookies.filter(cookie => {
           const domain = String(cookie.domain || '').replace(/^\./, '').toLowerCase();
@@ -1490,7 +1501,7 @@ function runGUI() {
           return { success: true };
         }
 
-        const googleSession = session.fromPartition('persist:riff-google');
+        const googleSession = session.fromPartition('persist:raser-google');
         const loginWindow = new BrowserWindow({
           width: 1000,
           height: 760,
@@ -1542,7 +1553,8 @@ function runGUI() {
           fs.mkdirSync(DATA_DIR, { recursive: true });
           await fs.promises.writeFile(YT_LOGOUT_FLAG, '1', 'utf8');
           await fs.promises.rm(YT_COOKIES_FILE, { force: true });
-          await session.fromPartition('persist:riff-google').clearStorageData({ storages: ['cookies'] });
+          await session.fromPartition('persist:raser-google').clearStorageData({ storages: ['cookies'] });
+          try { await session.fromPartition('persist:riff-google').clearStorageData({ storages: ['cookies'] }); } catch (_) {}
           return { success: true, loggedIn: false };
         } catch (error) {
           return { success: false, error: error && error.message ? error.message : 'Could not sign out of YouTube.' };
@@ -1754,14 +1766,14 @@ function runGUI() {
               const actual = Buffer.from(returnedState);
               if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) {
                 res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
-                res.end('Authorization could not be verified. Return to Riff and try again.');
+                res.end('Authorization could not be verified. Return to Raser and try again.');
                 finish(new Error('Google authorization state did not match'));
                 return;
               }
               const providerError = requestUrl.searchParams.get('error');
               if (providerError) {
                 res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-                res.end('<!doctype html><title>Riff</title><p>Google sign-in was cancelled. You can close this tab and return to Riff.</p>');
+                res.end('<!doctype html><title>Raser</title><p>Google sign-in was cancelled. You can close this tab and return to Raser.</p>');
                 finish(new Error(providerError === 'access_denied'
                   ? 'Google sign-in was cancelled'
                   : `Google authorization failed: ${providerError}`));
@@ -1770,12 +1782,12 @@ function runGUI() {
               const code = requestUrl.searchParams.get('code');
               if (!code) {
                 res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
-                res.end('Google did not return an authorization code. Return to Riff and try again.');
+                res.end('Google did not return an authorization code. Return to Raser and try again.');
                 finish(new Error('Google did not return an authorization code'));
                 return;
               }
               res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-              res.end('<!doctype html><title>Riff</title><p>Google account connected. You can close this tab and return to Riff.</p>');
+              res.end('<!doctype html><title>Raser</title><p>Google account connected. You can close this tab and return to Raser.</p>');
               finish(null, { code });
             };
             server.on('request', onRequest);
@@ -1788,7 +1800,7 @@ function runGUI() {
             codeVerifier
           });
           if (!tokens.refresh_token) {
-            throw new Error('Google did not provide a refresh token. Revoke Riff access in your Google account and try again.');
+            throw new Error('Google did not provide a refresh token. Revoke Raser access in your Google account and try again.');
           }
           writeGoogleOAuthData({
             accessToken: tokens.access_token,
@@ -1827,8 +1839,9 @@ function runGUI() {
           fs.writeFileSync(YT_LOGOUT_FLAG, '1', 'utf8');
           if (fs.existsSync(GOOGLE_OAUTH_FILE)) fs.unlinkSync(GOOGLE_OAUTH_FILE);
           if (fs.existsSync(YT_COOKIES_FILE)) fs.unlinkSync(YT_COOKIES_FILE);
-          const s = session.fromPartition('persist:riff-google');
+          const s = session.fromPartition('persist:raser-google');
           await s.clearStorageData();
+          try { await session.fromPartition('persist:riff-google').clearStorageData(); } catch (_) {}
         } catch (e) {
           return { success: false, error: e && e.message ? e.message : 'Logout failed' };
         }
@@ -1874,7 +1887,7 @@ function runGUI() {
           }
         }
 
-        const s = session.fromPartition('persist:riff-google');
+        const s = session.fromPartition('persist:raser-google');
         const cookies = await s.cookies.get({ name: 'SAPISID' });
         const sapisidCookie = Array.isArray(cookies) ? cookies.find(c => c && c.value) : null;
         if (!sapisidCookie) {
@@ -2202,7 +2215,7 @@ function runGUI() {
             trayIcon = nativeImage.createFromPath(path.join(__dirname, '../../assets', 'icon.png')).resize({ width: 22, height: 22 });
           }
           tray = new Tray(trayIcon);
-          tray.setToolTip('Riff');
+          tray.setToolTip('Raser');
           const contextMenu = Menu.buildFromTemplate([
             {
               label: 'Show/Hide',
@@ -2247,7 +2260,7 @@ function runGUI() {
 
       app.whenReady().then(() => {
         if (!fs.existsSync(YT_LOGOUT_FLAG)) exportYoutubeCookiesToDisk().catch(() => {});
-        global.riffSessionFetch = (urlStr, opts) => session.defaultSession.fetch(urlStr, opts);
+        global.raserSessionFetch = global.riffSessionFetch = (urlStr, opts) => session.defaultSession.fetch(urlStr, opts);
         // Packaged builds use the bundle icon; only replace Electron's default in dev.
         if (IS_MAC && app.dock && !app.isPackaged) {
           try {

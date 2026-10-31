@@ -25,8 +25,8 @@ function get(port, route, token) {
 }
 
 test('Spotify login persists securely, refreshes, restores, and rejects partial link imports', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'riff-spotify-'));
-  const oldDataDir = process.env.RIFF_DATA_DIR;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'raser-spotify-'));
+  const oldDataDir = process.env.RASER_DATA_DIR || process.env.RIFF_DATA_DIR;
   const oldElectronVersion = process.versions.electron;
   const oldLoad = Module._load;
   const oldRequest = https.request;
@@ -58,6 +58,7 @@ test('Spotify login persists securely, refreshes, restores, and rejects partial 
   };
 
   try {
+    process.env.RASER_DATA_DIR = dir;
     process.env.RIFF_DATA_DIR = dir;
     process.versions.electron = '41';
     Module._load = function (name, parent, isMain) {
@@ -184,8 +185,13 @@ test('Spotify login persists securely, refreshes, restores, and rejects partial 
     https.request = oldRequest;
     https.get = oldGet;
     Module._load = oldLoad;
-    if (oldDataDir === undefined) delete process.env.RIFF_DATA_DIR;
-    else process.env.RIFF_DATA_DIR = oldDataDir;
+    if (oldDataDir === undefined) {
+      delete process.env.RASER_DATA_DIR;
+      delete process.env.RIFF_DATA_DIR;
+    } else {
+      process.env.RASER_DATA_DIR = oldDataDir;
+      process.env.RIFF_DATA_DIR = oldDataDir;
+    }
     if (oldElectronVersion === undefined) delete process.versions.electron;
     else process.versions.electron = oldElectronVersion;
     fs.rmSync(dir, { recursive: true, force: true });
