@@ -18,10 +18,10 @@ const {
 } = require('./google-oauth');
 const { fetchYouTubeLibrary } = require('./youtube-data');
 const RFACC_KEY = crypto.createHash('sha256').update('riff-account-key-v1').digest();
-const APP_ID = 'io.github.rootscripts.riff';
+const APP_ID = 'io.github.darkness38.raser';
 const IS_MAC = process.platform === 'darwin';
 
-app.setName('Riff');
+app.setName('Raser');
 if (process.platform === 'win32') app.setAppUserModelId(APP_ID);
 
 function encryptAccount(dataObj) {
@@ -205,6 +205,15 @@ function runGUI() {
   function readStorageDiskSync() {
     const file = getActiveStorageFile();
     try {
+      if (!fs.existsSync(file)) {
+        const legacyRiffFile = path.join(path.dirname(app.getPath('userData')), 'Riff', 'storage.json');
+        if (fs.existsSync(legacyRiffFile)) {
+          try {
+            fs.mkdirSync(path.dirname(file), { recursive: true });
+            fs.copyFileSync(legacyRiffFile, file);
+          } catch (_) {}
+        }
+      }
       if (fs.existsSync(file)) {
         const raw = fs.readFileSync(file, 'utf8').trim();
         if (raw) {
@@ -390,7 +399,7 @@ function runGUI() {
       minWidth: 800,
       minHeight: 540,
                                    backgroundColor: firstRun ? '#8d5ef2' : '#000000',
-                                   title: 'Riff',
+                                   title: 'Raser',
                                    icon: path.join(__dirname, '../../assets', 'icon.png'),
                                    // macOS keeps its native traffic lights; frame:false would remove
                                    // them and the custom window buttons are hidden there.
