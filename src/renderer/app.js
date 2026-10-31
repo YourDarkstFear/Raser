@@ -13997,6 +13997,7 @@ function bindCoverHoldZoom(wrapEl) {
   function setPlatform(platform, triggerSearch = true) {
     if (!['youtube', 'ytmusic', 'soundcloud'].includes(platform)) platform = 'ytmusic';
     state.platform = platform;
+    localStorage.setItem('raser_platform', platform);
     localStorage.setItem('riff_platform', platform);
 
     if (el.platformYt) el.platformYt.classList.toggle('active', platform === 'youtube');
@@ -14015,12 +14016,17 @@ function bindCoverHoldZoom(wrapEl) {
       });
     }
 
-    if (triggerSearch && el.searchInput && el.searchInput.value.trim()) {
+    const isSearchActive = state.currentView === 'discover' &&
+                           el.searchResultsContainer &&
+                           !el.searchResultsContainer.classList.contains('hidden') &&
+                           Boolean(el.searchInput && el.searchInput.value.trim());
+
+    if (triggerSearch && isSearchActive) {
       performSearch(el.searchInput.value);
     }
   }
 
-  const savedPlatform = localStorage.getItem('riff_platform') || 'ytmusic';
+  const savedPlatform = localStorage.getItem('raser_platform') || localStorage.getItem('riff_platform') || 'ytmusic';
   setPlatform(savedPlatform, false);
 
   if (el.platformYt) el.platformYt.addEventListener('click', () => setPlatform('youtube'));
