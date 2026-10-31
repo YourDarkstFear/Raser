@@ -700,27 +700,7 @@ const verifyGoogleVideoStream = verifyStreamPlayable;
 async function fetchDirectYoutubeStreamServer(videoId, quality = 'medium') {
   const vid = extractYtIdFromAny(videoId);
   if (!vid) return null;
-  const clients = [
-    {
-      clientName: 'ANDROID_VR',
-      clientVersion: '1.61.48',
-      androidSdkVersion: 32,
-      deviceMake: 'Oculus',
-      deviceModel: 'Quest 3',
-      userAgent: 'com.google.android.apps.youtube.vr.oculus/1.61.48 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip',
-      osName: 'Android',
-      osVersion: '12L'
-    },
-    {
-      clientName: 'IOS',
-      clientVersion: '20.10.4',
-      deviceMake: 'Apple',
-      deviceModel: 'iPhone16,2',
-      userAgent: 'com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)',
-      osName: 'iOS',
-      osVersion: '18.3.2.22D60'
-    }
-  ];
+  const clients = [];
 
   const authHeaders = getYtAuthHeaders('https://www.youtube.com');
   if (authHeaders) {
@@ -731,6 +711,7 @@ async function fetchDirectYoutubeStreamServer(videoId, quality = 'medium') {
       extraHeaders: authHeaders
     });
   }
+  if (clients.length === 0) return null;
 
   const queryClient = (c) => new Promise((resolve, reject) => {
     const clientPayload = {
