@@ -129,8 +129,20 @@ const APP_VERSION = (() => { try { return require('../../package.json').version 
 function tutorialDone() {
   for (const file of [TUTORIAL_MARKER, TUTORIAL_MARKER_FALLBACK, TUTORIAL_LEGACY_MARKER, TUTORIAL_LEGACY_FALLBACK]) {
     try {
-      if (!fs.existsSync(file)) continue;
-      if (fs.readFileSync(file, 'utf8').trim() === APP_VERSION) return true;
+      if (fs.existsSync(file)) return true;
+    } catch (e) {}
+  }
+  for (const configDir of [
+    path.join(os.homedir(), '.config', 'Raser'),
+    path.join(os.homedir(), '.config', 'Riff'),
+    path.join(os.homedir(), 'AppData', 'Roaming', 'Raser'),
+    path.join(os.homedir(), 'AppData', 'Roaming', 'Riff'),
+    path.join(os.homedir(), 'Library', 'Application Support', 'Raser'),
+    path.join(os.homedir(), 'Library', 'Application Support', 'Riff'),
+    DEFAULT_DATA_DIR
+  ]) {
+    try {
+      if (fs.existsSync(path.join(configDir, 'storage.json'))) return true;
     } catch (e) {}
   }
   return false;

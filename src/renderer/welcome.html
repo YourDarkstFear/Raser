@@ -1921,9 +1921,13 @@
       tintMatrix.setAttribute('values', `0 0 0 0 ${f(rgb[0])}  0 0 0 0 ${f(rgb[1])}  0 0 0 0 ${f(rgb[2])}  0 0 0 1 0`);
     }
 
-    buildProfiles();
-    drawShape(shapeProfiles[0], shapeProfiles[0], 0, 1, 1);
-    updateIconTint();
+    try {
+      buildProfiles();
+      drawShape(shapeProfiles[0], shapeProfiles[0], 0, 1, 1);
+      updateIconTint();
+    } catch (e) {
+      console.warn('Shape profile init error:', e);
+    }
 
     let introStarted = false;
 
@@ -1931,22 +1935,16 @@
       if (introStarted) return;
       introStarted = true;
       document.body.classList.add('intro');
-      startShapeLoop(2600);
+      try { startShapeLoop(2600); } catch (e) {}
       setTimeout(() => document.body.classList.add('intro-done'), 4200);
     }
 
     function scheduleIntro() {
-      if (document.visibilityState === 'visible') {
-        setTimeout(startIntro, 250);
-        return;
-      }
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') setTimeout(startIntro, 250);
-      });
-      setTimeout(startIntro, 8000);
+      setTimeout(startIntro, 100);
     }
 
-    Promise.race([document.fonts.ready, new Promise((resolve) => setTimeout(resolve, 1200))]).then(scheduleIntro, scheduleIntro);
+    scheduleIntro();
+    Promise.race([document.fonts.ready, new Promise((resolve) => setTimeout(resolve, 800))]).then(scheduleIntro, scheduleIntro);
 
     applyPreset('light-purple-vibrant');
 
