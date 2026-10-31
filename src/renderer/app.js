@@ -10898,10 +10898,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let prefetchTimer = null;
         row.addEventListener('mouseenter', () => {
-          if (track.url && track.platform !== 'local') {
+          if (track.platform !== 'local' && !track._preloadedStreamUrl) {
             prefetchTimer = setTimeout(() => {
-              fetch(`http://127.0.0.1:${state.serverPort}/api/prefetch?url=${encodeURIComponent(track.url)}&id=${encodeURIComponent(track.id)}&platform=${track.platform || state.platform}`).catch(() => {});
-            }, 120);
+              const qFallback = encodeURIComponent(track.searchQuery || ((track.artist ? track.artist + ' - ' : '') + track.title));
+              const prefetchUrl = `http://127.0.0.1:${state.serverPort}/api/stream-info?id=${encodeURIComponent(track.resolvedId || track.id || '')}&url=${encodeURIComponent(track.url || '')}&platform=${encodeURIComponent(track.platform || state.platform || 'youtube')}&title=${encodeURIComponent(track.title || '')}&artist=${encodeURIComponent(track.artist || '')}&duration=${encodeURIComponent(track.duration || 0)}&q=${qFallback}`;
+              fetch(prefetchUrl)
+                .then(r => r.json())
+                .then(data => {
+                  if (data && data.success && data.streamUrl) {
+                    track._preloadedStreamUrl = data.streamUrl;
+                    if (data.resolvedId) track.resolvedId = data.resolvedId;
+                  }
+                })
+                .catch(() => {});
+            }, 100);
           }
         });
         row.addEventListener('mouseleave', () => {
@@ -11088,6 +11098,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       };
       container.innerHTML = `<div class="empty-hint">${emptyMessages[context] || 'No tracks to show'}</div>`;
       return;
+    }
+
+    if (context !== 'local' && tracks && tracks.length > 0) {
+      setTimeout(() => {
+        tracks.slice(0, 2).forEach(t => {
+          if (t && t.platform !== 'local' && !t._preloadedStreamUrl) {
+            const qFallback = encodeURIComponent(t.searchQuery || ((t.artist ? t.artist + ' - ' : '') + t.title));
+            const prefetchUrl = `http://127.0.0.1:${state.serverPort}/api/stream-info?id=${encodeURIComponent(t.resolvedId || t.id || '')}&url=${encodeURIComponent(t.url || '')}&platform=${encodeURIComponent(t.platform || state.platform || 'youtube')}&title=${encodeURIComponent(t.title || '')}&artist=${encodeURIComponent(t.artist || '')}&duration=${encodeURIComponent(t.duration || 0)}&q=${qFallback}`;
+            fetch(prefetchUrl)
+              .then(r => r.json())
+              .then(data => {
+                if (data && data.success && data.streamUrl) {
+                  t._preloadedStreamUrl = data.streamUrl;
+                  if (data.resolvedId) t.resolvedId = data.resolvedId;
+                }
+              })
+              .catch(() => {});
+          }
+        });
+      }, 250);
     }
 
     const itemHeight = 64;
