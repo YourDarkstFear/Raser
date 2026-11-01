@@ -1,5 +1,5 @@
 (function initRiffDiskStorageDaemon() {
-if (!window.electronAPI || typeof window.electronAPI.storageInitSync !== 'function') return;
+if (typeof window === 'undefined' || !window.electronAPI || typeof window.electronAPI.storageInitSync !== 'function') return;
 const origGet = Storage.prototype.getItem;
 const origSet = Storage.prototype.setItem;
 const origRemove = Storage.prototype.removeItem;
@@ -265,7 +265,129 @@ const HomeCache = {
     } catch (_) {}
   }
 };
-window.HomeCache = HomeCache;
+if (typeof window !== 'undefined') {
+  window.HomeCache = HomeCache;
+}
+
+function parseEnhancedLrcWords(lineStr, lineStart, lineEnd) {
+  const tagRegex = /<(\d+):(\d+(?:\.\d+)?)>/g;
+  let m;
+  const tags = [];
+  while ((m = tagRegex.exec(lineStr)) !== null) {
+    const min = parseInt(m[1], 10);
+    const sec = parseFloat(m[2]);
+    tags.push({ time: min * 60 + sec, startIdx: m.index, endIdx: m.index + m[0].length });
+  }
+  if (tags.length === 0) return null;
+  const words = [];
+  for (let i = 0; i < tags.length; i++) {
+    const cur = tags[i];
+    const nxt = tags[i + 1];
+    const wText = lineStr.substring(cur.endIdx, nxt ? nxt.startIdx : lineStr.length).trim();
+    if (wText) {
+      const wStart = cur.time;
+      const wEnd = nxt ? nxt.time : (lineEnd > wStart ? lineEnd : wStart + 0.5);
+      words.push({ text: wText, start: wStart, end: wEnd });
+    }
+  }
+  return words.length > 0 ? words : null;
+}
+
+function parseLrc(lrcText) {
+  if (!lrcText || typeof lrcText !== 'string') return [];
+  const lines = lrcText.split(/\r?\n/);
+  const result = [];
+  let offsetSec = 0;
+  const offsetMatch = lrcText.match(/\[offset:\s*([+-]?\d+)\s*\]/i);
+  if (offsetMatch) {
+    offsetSec = parseInt(offsetMatch[1], 10) / 1000;
+  }
+
+  const tagRegex = /\[(\d{1,2}):(\d{1,2}(?:[:.]\d{1,3})?)\]/g;
+  const metaHeaderRegex = /^\[(ti|ar|al|by|offset|length|re|ve|id|hash|sign|qq|total):[^\]]*\]$/i;
+  const headerStripRegex = /\[(?!(?:\d+:\d+|instrumental|music|intro|outro|solo)\b)[^\]]*\]/gi;
+
+  const gapPattern1 = /^[\s♪♫\-–—.]*$/;
+  const gapPattern2 = /^[\(\[]?\s*(?:instrumental|music|intro|outro|solo|interlude|break)\s*[\)\]]?$/i;
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) continue;
+    if (metaHeaderRegex.test(trimmedLine)) continue;
+
+    const timestamps = [];
+    let match;
+    tagRegex.lastIndex = 0;
+    while ((match = tagRegex.exec(line)) !== null) {
+      const min = parseInt(match[1], 10);
+      const sec = parseFloat(match[2].replace(':', '.'));
+      timestamps.push(min * 60 + sec + offsetSec);
+    }
+
+    const cleanRaw = line.replace(tagRegex, '').replace(headerStripRegex, '').trim();
+    if (timestamps.length > 0) {
+      for (const t of timestamps) {
+        const time = Math.max(0, Math.round(t * 1000) / 1000);
+        if (!cleanRaw || gapPattern1.test(cleanRaw) || gapPattern2.test(cleanRaw)) {
+          result.push({ time, text: '', isGap: true });
+        } else {
+          const cleanText = cleanRaw.replace(/<[^>]+>/g, '').trim();
+          const enhWords = typeof parseEnhancedLrcWords === 'function' ? parseEnhancedLrcWords(cleanRaw, time, time + 4.0) : undefined;
+          result.push({ time, text: cleanText, words: enhWords || undefined });
+        }
+      }
+    } else if (cleanRaw) {
+      if (gapPattern1.test(cleanRaw) || gapPattern2.test(cleanRaw)) {
+        result.push({ time: -1, text: '', isGap: true });
+      } else {
+        result.push({ time: -1, text: cleanRaw.replace(/<[^>]+>/g, '').trim() });
+      }
+    }
+  }
+
+  return result.sort((a, b) => {
+    if (a.time < 0 && b.time >= 0) return 1;
+    if (a.time >= 0 && b.time < 0) return -1;
+    return a.time - b.time;
+  });
+}
+
+function getTrackLyricsOffset(track) {
+  if (!track) return 0;
+  const cid = (typeof getTrackCanonicalId === 'function' ? getTrackCanonicalId(track) : '') || track.id || (track.artist + '_' + track.title);
+  if (!cid) return 0;
+  try {
+    const storageObj = typeof localStorage !== 'undefined' ? localStorage : (typeof window !== 'undefined' ? window.localStorage : null);
+    if (!storageObj) return 0;
+    const map = JSON.parse(storageObj.getItem('riff_lyrics_offsets') || '{}');
+    return typeof map[cid] === 'number' ? map[cid] : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+function setTrackLyricsOffset(track, offsetSec) {
+  if (!track) return;
+  const cid = (typeof getTrackCanonicalId === 'function' ? getTrackCanonicalId(track) : '') || track.id || (track.artist + '_' + track.title);
+  if (!cid) return;
+  try {
+    const storageObj = typeof localStorage !== 'undefined' ? localStorage : (typeof window !== 'undefined' ? window.localStorage : null);
+    if (!storageObj) return;
+    const map = JSON.parse(storageObj.getItem('riff_lyrics_offsets') || '{}');
+    if (offsetSec === 0) {
+      delete map[cid];
+    } else {
+      map[cid] = Math.round(offsetSec * 10) / 10;
+    }
+    storageObj.setItem('riff_lyrics_offsets', JSON.stringify(map));
+  } catch (_) {}
+}
+
+if (typeof window !== 'undefined') {
+  window.parseLrc = parseLrc;
+  window.getTrackLyricsOffset = getTrackLyricsOffset;
+  window.setTrackLyricsOffset = setTrackLyricsOffset;
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   var state = { vibeTracks: [] };
@@ -4709,119 +4831,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       return res;
     };
   });
-
-  function parseEnhancedLrcWords(lineStr, lineStart, lineEnd) {
-    const tagRegex = /<(\d+):(\d+(?:\.\d+)?)>/g;
-    let m;
-    const tags = [];
-    while ((m = tagRegex.exec(lineStr)) !== null) {
-      const min = parseInt(m[1], 10);
-      const sec = parseFloat(m[2]);
-      tags.push({ time: min * 60 + sec, startIdx: m.index, endIdx: m.index + m[0].length });
-    }
-    if (tags.length === 0) return null;
-    const words = [];
-    for (let i = 0; i < tags.length; i++) {
-      const cur = tags[i];
-      const nxt = tags[i + 1];
-      const wText = lineStr.substring(cur.endIdx, nxt ? nxt.startIdx : lineStr.length).trim();
-      if (wText) {
-        const wStart = cur.time;
-        const wEnd = nxt ? nxt.time : (lineEnd > wStart ? lineEnd : wStart + 0.5);
-        words.push({ text: wText, start: wStart, end: wEnd });
-      }
-    }
-    return words.length > 0 ? words : null;
-  }
-
-  function parseLrc(lrcText) {
-    if (!lrcText || typeof lrcText !== 'string') return [];
-    const lines = lrcText.split(/\r?\n/);
-    const result = [];
-    let offsetSec = 0;
-    const offsetMatch = lrcText.match(/\[offset:\s*([+-]?\d+)\s*\]/i);
-    if (offsetMatch) {
-      offsetSec = parseInt(offsetMatch[1], 10) / 1000;
-    }
-
-    const tagRegex = /\[(\d{1,2}):(\d{1,2}(?:[:.]\d{1,3})?)\]/g;
-    const metaHeaderRegex = /^\[(ti|ar|al|by|offset|length|re|ve|id|hash|sign|qq|total):[^\]]*\]$/i;
-    const headerStripRegex = /\[(?!(?:\d+:\d+|instrumental|music|intro|outro|solo)\b)[^\]]*\]/gi;
-
-    const gapPattern1 = /^[\s♪♫\-–—.]*$/;
-    const gapPattern2 = /^[\(\[]?\s*(?:instrumental|music|intro|outro|solo|interlude|break)\s*[\)\]]?$/i;
-
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) continue;
-      if (metaHeaderRegex.test(trimmedLine)) continue;
-
-      const timestamps = [];
-      let match;
-      tagRegex.lastIndex = 0;
-      while ((match = tagRegex.exec(line)) !== null) {
-        const min = parseInt(match[1], 10);
-        const sec = parseFloat(match[2].replace(':', '.'));
-        timestamps.push(min * 60 + sec + offsetSec);
-      }
-
-      const cleanRaw = line.replace(tagRegex, '').replace(headerStripRegex, '').trim();
-      if (timestamps.length > 0) {
-        for (const t of timestamps) {
-          const time = Math.max(0, Math.round(t * 1000) / 1000);
-          if (!cleanRaw || gapPattern1.test(cleanRaw) || gapPattern2.test(cleanRaw)) {
-            result.push({ time, text: '', isGap: true });
-          } else {
-            const cleanText = cleanRaw.replace(/<[^>]+>/g, '').trim();
-            const enhWords = typeof parseEnhancedLrcWords === 'function' ? parseEnhancedLrcWords(cleanRaw, time, time + 4.0) : undefined;
-            result.push({ time, text: cleanText, words: enhWords || undefined });
-          }
-        }
-      } else if (cleanRaw) {
-        if (gapPattern1.test(cleanRaw) || gapPattern2.test(cleanRaw)) {
-          result.push({ time: -1, text: '', isGap: true });
-        } else {
-          result.push({ time: -1, text: cleanRaw.replace(/<[^>]+>/g, '').trim() });
-        }
-      }
-    }
-
-    return result.sort((a, b) => {
-      if (a.time < 0 && b.time >= 0) return 1;
-      if (a.time >= 0 && b.time < 0) return -1;
-      return a.time - b.time;
-    });
-  }
-  window.parseLrc = parseLrc;
-
-  function getTrackLyricsOffset(track) {
-    if (!track) return 0;
-    const cid = (typeof getTrackCanonicalId === 'function' ? getTrackCanonicalId(track) : '') || track.id || (track.artist + '_' + track.title);
-    if (!cid) return 0;
-    try {
-      const map = JSON.parse(localStorage.getItem('riff_lyrics_offsets') || '{}');
-      return typeof map[cid] === 'number' ? map[cid] : 0;
-    } catch (_) {
-      return 0;
-    }
-  }
-  window.getTrackLyricsOffset = getTrackLyricsOffset;
-
-  function setTrackLyricsOffset(track, offsetSec) {
-    if (!track) return;
-    const cid = (typeof getTrackCanonicalId === 'function' ? getTrackCanonicalId(track) : '') || track.id || (track.artist + '_' + track.title);
-    if (!cid) return;
-    try {
-      const map = JSON.parse(localStorage.getItem('riff_lyrics_offsets') || '{}');
-      if (offsetSec === 0) {
-        delete map[cid];
-      } else {
-        map[cid] = Math.round(offsetSec * 10) / 10;
-      }
-      localStorage.setItem('riff_lyrics_offsets', JSON.stringify(map));
-    } catch (_) {}
-  }
-  window.setTrackLyricsOffset = setTrackLyricsOffset;
 
   function updateLyricsOffsetUI() {
     const elVal = document.getElementById('lyrics-offset-val');

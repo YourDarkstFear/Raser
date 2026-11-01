@@ -488,19 +488,20 @@ function getMaxCacheLimit() {
   return DEFAULT_MAX_CACHE_BYTES;
 }
 
-async function pruneDiskCache(customMaxBytes) {
+async function pruneDiskCache(customMaxBytes, customDir) {
   try {
+    const dir = customDir || require('../shared/platform').CACHE_DIR || CACHE_DIR;
     const maxBytes = typeof customMaxBytes === 'number' && customMaxBytes > 0
       ? customMaxBytes
       : getMaxCacheLimit();
 
-    const files = await fs.promises.readdir(CACHE_DIR);
+    const files = await fs.promises.readdir(dir);
     const now = Date.now();
     const audioCandidates = [];
     let totalBytes = 0;
 
     for (const file of files) {
-      const fullPath = path.join(CACHE_DIR, file);
+      const fullPath = path.join(dir, file);
       try {
         const stat = await fs.promises.stat(fullPath);
         if (file.includes('.temp.')) {
