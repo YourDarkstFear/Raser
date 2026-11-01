@@ -6148,7 +6148,7 @@ async function handleSpotifyImport(req, res, inputUrl) {
     }
 
     const hasLegacyTrackList = Array.isArray(entity?.trackList);
-    const rawTrackCount = hasLegacyTrackList ? entity.trackList.length : (candidateTrackList.length || tracks.length);
+    const rawTrackCount = hasLegacyTrackList ? entity.trackList.length : tracks.length;
     const expectedTotal = Number.isInteger(entity?.totalCount)
       ? entity.totalCount
       : (Number.isInteger(entity?.tracks?.total) ? entity.tracks.total : (Number.isInteger(total) ? total : rawTrackCount));
