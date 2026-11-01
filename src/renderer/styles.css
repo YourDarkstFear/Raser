@@ -1606,6 +1606,71 @@ body.perf .my-wave-ambient-light {
 .track-row.playing {
   background: var(--md-sys-color-surface-container-high);
 }
+.track-row.playing .track-row-title {
+  color: var(--md-sys-color-primary);
+  font-weight: 700;
+}
+.track-row.playing .track-num-text {
+  display: none !important;
+}
+.track-row.playing .playing-equalizer-bars {
+  display: inline-flex !important;
+}
+
+.playing-equalizer-bars {
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  width: 14px;
+  height: 14px;
+  margin: 0 auto;
+}
+
+.playing-equalizer-bars .eq-bar {
+  width: 3px;
+  height: 100%;
+  background-color: var(--md-sys-color-primary);
+  border-radius: 1.5px;
+  transform-origin: bottom;
+  animation: eq-bounce 1s ease-in-out infinite alternate;
+}
+
+.playing-equalizer-bars .eq-bar-1 {
+  animation-duration: 0.65s;
+  animation-delay: 0.1s;
+  height: 60%;
+}
+
+.playing-equalizer-bars .eq-bar-2 {
+  animation-duration: 0.85s;
+  animation-delay: 0.25s;
+  height: 100%;
+}
+
+.playing-equalizer-bars .eq-bar-3 {
+  animation-duration: 0.55s;
+  animation-delay: 0.4s;
+  height: 75%;
+}
+
+@keyframes eq-bounce {
+  0% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+  100% {
+    transform: scaleY(0.4);
+  }
+}
+
+.track-row.playing.paused .eq-bar,
+body:not(.audio-playing) .track-row.playing .eq-bar {
+  animation-play-state: paused !important;
+  transform: scaleY(0.35) !important;
+}
 .track-row-num,
 .track-row-index {
   font-size: calc(12px * var(--font-scale, 1));

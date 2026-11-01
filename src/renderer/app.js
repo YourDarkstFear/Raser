@@ -11086,9 +11086,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (state.currentTrackContext === context && state.currentTrackIndexInContext >= 0) {
           if (state.currentTrackIndexInContext === idx) {
             row.classList.add('playing');
+            if (!state.isPlaying) row.classList.add('paused');
           }
         } else {
           row.classList.add('playing');
+          if (!state.isPlaying) row.classList.add('paused');
         }
       }
 
@@ -11102,7 +11104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const explicitTag = isTrackExplicit(track) ? '<span class="explicit-badge" title="Explicit">E</span>' : '';
 
       row.innerHTML = `
-      <div class="track-row-num"><span class="track-num-text">${index + 1}</span><span class="tg-select-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span></div>
+      <div class="track-row-num"><span class="track-num-text">${index + 1}</span><div class="playing-equalizer-bars" aria-label="Playing"><span class="eq-bar eq-bar-1"></span><span class="eq-bar eq-bar-2"></span><span class="eq-bar eq-bar-3"></span></div><span class="tg-select-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span></div>
       ${!isAlbum ? `
       <div class="track-row-thumb-wrap">
         <svg class="track-row-fallback-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
@@ -11442,28 +11444,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     const rows = document.querySelectorAll('.track-row');
 
     if (!currentCanonicalId) {
-      rows.forEach(r => r.classList.remove('playing'));
+      rows.forEach(r => r.classList.remove('playing', 'paused'));
       return;
     }
 
     const containers = new Set();
     rows.forEach(r => {
-      r.classList.remove('playing');
+      r.classList.remove('playing', 'paused');
       if (r.parentElement) containers.add(r.parentElement);
     });
 
     containers.forEach(container => {
       const matches = Array.from(container.querySelectorAll('.track-row')).filter(r => r.dataset.canonicalId === currentCanonicalId);
+      let targetRow = null;
       if (matches.length === 1) {
-        matches[0].classList.add('playing');
+        targetRow = matches[0];
       } else if (matches.length > 1) {
         const targetIdx = String(state.currentTrackIndexInContext);
-        const exact = matches.find(r => r.dataset.trackIndex === targetIdx);
-        if (exact) {
-          exact.classList.add('playing');
-        } else {
-          matches[0].classList.add('playing');
-        }
+        targetRow = matches.find(r => r.dataset.trackIndex === targetIdx) || matches[0];
+      }
+      if (targetRow) {
+        targetRow.classList.add('playing');
+        targetRow.classList.toggle('paused', !state.isPlaying);
       }
     });
   }
@@ -13941,6 +13943,10 @@ function updateNavIndicator(animate) {
       if (el.pauseIcon) el.pauseIcon.classList.remove('hidden');
       setPlayPauseState(actuallyPlaying, true);
     }
+    if (document.body) document.body.classList.toggle('audio-playing', actuallyPlaying);
+    document.querySelectorAll('.track-row.playing').forEach(r => {
+      r.classList.toggle('paused', !actuallyPlaying);
+    });
   }
 
   setPlayPauseState(false, false);
