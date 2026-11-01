@@ -2367,51 +2367,8 @@ body.perf .artist-tab-pane:not(.hidden) { animation: none !important; }
 .lyrics-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding-bottom: 8px;
-}
-.lyrics-offset-bar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  background: var(--md-sys-color-surface-container);
-  border-radius: var(--md-shape-corner-full);
-  padding: 2px 6px;
-  font-size: calc(11px * var(--font-scale, 1));
-}
-.lyrics-offset-label {
-  font-size: calc(10px * var(--font-scale, 1));
-  font-weight: 600;
-  color: var(--md-sys-color-on-surface-variant);
-  margin-right: 2px;
-  user-select: none;
-}
-.lyrics-offset-val {
-  font-variant-numeric: tabular-nums;
-  font-size: calc(11px * var(--font-scale, 1));
-  font-weight: 600;
-  color: var(--md-sys-color-primary);
-  min-width: 32px;
-  text-align: center;
-  user-select: none;
-}
-.lyrics-offset-btn {
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: var(--md-sys-color-on-surface-variant);
-  font-size: calc(10px * var(--font-scale, 1));
-  font-weight: 500;
-  padding: 2px 4px;
-  cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
-}
-.lyrics-offset-btn:hover {
-  background: var(--md-sys-color-surface-container-high);
-  color: var(--md-sys-color-on-surface);
-}
-.lyrics-offset-btn:active {
-  transform: scale(0.95);
 }
 .lyrics-label {
   font-size: calc(13px * var(--font-scale, 1));
