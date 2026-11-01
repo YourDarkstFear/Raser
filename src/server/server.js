@@ -726,6 +726,22 @@ async function fetchDirectYoutubeStreamServer(videoId, quality = 'medium') {
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       extraHeaders: authHeaders
     });
+  } else {
+    clients.push({
+      clientName: 'WEB_REMIX',
+      clientVersion: '1.20250922.01.00',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+    });
+    clients.push({
+      clientName: 'ANDROID',
+      clientVersion: '19.44.38',
+      androidSdkVersion: 34,
+      osName: 'Android',
+      osVersion: '14',
+      deviceMake: 'Google',
+      deviceModel: 'Pixel 8 Pro',
+      userAgent: 'com.google.android.youtube/19.44.38 (Linux; U; Android 14; en_US; sdk_gphone64_x86_64 Build/UE1A.230829.036) gzip'
+    });
   }
   if (clients.length === 0) return null;
 
@@ -816,6 +832,28 @@ async function fetchDirectYoutubeStreamServer(videoId, quality = 'medium') {
   try {
     return await Promise.any(clients.map(queryClient));
   } catch (_) {
+    if (authHeaders) {
+      try {
+        const anonClients = [
+          {
+            clientName: 'WEB_REMIX',
+            clientVersion: '1.20250922.01.00',
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+          },
+          {
+            clientName: 'ANDROID',
+            clientVersion: '19.44.38',
+            androidSdkVersion: 34,
+            osName: 'Android',
+            osVersion: '14',
+            deviceMake: 'Google',
+            deviceModel: 'Pixel 8 Pro',
+            userAgent: 'com.google.android.youtube/19.44.38 (Linux; U; Android 14; en_US; sdk_gphone64_x86_64 Build/UE1A.230829.036) gzip'
+          }
+        ];
+        return await Promise.any(anonClients.map(queryClient));
+      } catch (_) {}
+    }
     return null;
   }
 }
