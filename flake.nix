@@ -14,7 +14,7 @@
           version = "1.0.0";
           src = self;
 
-          npmDepsHash = "sha256-1LNdcdNT9OkR8KDI8sYPr7ud1JmpvMfMjyS/z42BG9Y=";
+          npmDepsHash = "sha256-Fu4RrKgt9t/HjgR8k5ERRMD1bW9NQ3hMEPpa5jWujBI=";
 
           ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
           forceGitDeps = true;
