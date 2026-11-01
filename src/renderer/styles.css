@@ -3163,6 +3163,30 @@ body.perf .playbar .time-label { transition: none !important; }
   cursor: grabbing;
 }
 
+.scrubber-tooltip {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%);
+  background: var(--md-sys-color-surface-container-highest, #36343b);
+  color: var(--md-sys-color-on-surface, #e6e0e9);
+  border: 1px solid var(--md-sys-color-outline-variant, rgba(255, 255, 255, 0.12));
+  font-size: calc(11px * var(--font-scale, 1));
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--md-shape-corner-small, 6px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  white-space: nowrap;
+  z-index: 100;
+  font-variant-numeric: tabular-nums;
+}
+.scrubber-track-container:hover .scrubber-tooltip,
+.scrubber-tooltip.visible {
+  opacity: 1;
+}
+
 .playbar-right {
   display: flex;
   align-items: center;

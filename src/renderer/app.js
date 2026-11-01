@@ -1435,6 +1435,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     hasDrawnPausedFrame = false;
   }
 
+  function getHighContrastColor(col) {
+    if (!col) return '#6750A4';
+    let r = 0, g = 0, b = 0;
+    if (col.startsWith('#')) {
+      let hex = col.slice(1);
+      if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+      if (hex.length >= 6) {
+        r = parseInt(hex.substring(0, 2), 16) || 0;
+        g = parseInt(hex.substring(2, 4), 16) || 0;
+        b = parseInt(hex.substring(4, 6), 16) || 0;
+      }
+    } else if (col.startsWith('rgb')) {
+      const m = col.match(/\d+/g);
+      if (m && m.length >= 3) {
+        r = parseInt(m[0], 10);
+        g = parseInt(m[1], 10);
+        b = parseInt(m[2], 10);
+      }
+    } else {
+      return col;
+    }
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    if (lum > 0.55) {
+      const factor = 0.55 / lum;
+      r = Math.min(255, Math.max(0, Math.round(r * factor)));
+      g = Math.min(255, Math.max(0, Math.round(g * factor)));
+      b = Math.min(255, Math.max(0, Math.round(b * factor)));
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+    return col;
+  }
+
   function boundMap(map, maxSize = 30) {
     if (!map) return;
     if (map instanceof Map) {
@@ -3472,12 +3504,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           scrubProgress += (targetProgress - scrubProgress) * Math.min(1, dt * followSpeed);
           scrubProgress = Math.max(0, Math.min(1, Number.isFinite(scrubProgress) ? scrubProgress : 0));
 
-          const targetAnim = isDraggingScrubber ? 1 : 0;
+          const targetAnim = (isDraggingScrubber || isHoveringScrubber) ? 1 : 0;
           scrubKnobAnim += (targetAnim - scrubKnobAnim) * Math.min(1, Math.max(0, dt * 16));
           scrubKnobAnim = Math.max(0, Math.min(1, Number.isFinite(scrubKnobAnim) ? scrubKnobAnim : 0));
-          const curKnobW = 7.5 + (9.0 - 7.5) * scrubKnobAnim;
+          const curKnobW = 7.5 + (9.5 - 7.5) * scrubKnobAnim;
           const curKnobH = 24 + (32 - 24) * scrubKnobAnim;
-          const curKnobR = Math.max(0, 3.75 + (4.5 - 3.75) * scrubKnobAnim);
+          const curKnobR = Math.max(0, 3.75 + (4.75 - 3.75) * scrubKnobAnim);
 
           const padLeft = 5.5;
           const padRight = 5.5;
@@ -3506,7 +3538,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           const bgEndX = sw - padRight;
 
           if (!cachedPrimaryColor) refreshCachedThemeColors();
-          const primaryColor = '#ffffff';
+          let primaryColor = cachedPrimaryColor || '#6750A4';
+          if (document.body.classList.contains('theme-light')) {
+            primaryColor = getHighContrastColor(primaryColor);
+          }
           const dimColor = cachedDimColor;
 
           const centerY = sh / 2;
@@ -3625,7 +3660,11 @@ document.addEventListener('DOMContentLoaded', async () => {
               tCtx.lineWidth = 9.5;
               tCtx.lineCap = 'round';
               tCtx.lineJoin = 'round';
-              tCtx.strokeStyle = '#ffffff';
+              let tvkAccent = cachedPrimaryColor || '#ffffff';
+              if (document.body.classList.contains('theme-light')) {
+                tvkAccent = getHighContrastColor(tvkAccent);
+              }
+              tCtx.strokeStyle = tvkAccent;
 
               if (document.body.classList.contains('no-wavy')) {
                 tCtx.moveTo(waveStart, centerY);
@@ -3652,7 +3691,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!noKnob) {
               tCtx.beginPath();
               tCtx.roundRect(knobLeft, centerY - curKnobH / 2, curKnobW, curKnobH, curKnobR);
-              tCtx.fillStyle = '#ffffff';
+              let tvkKnob = cachedPrimaryColor || '#ffffff';
+              if (document.body.classList.contains('theme-light')) {
+                tvkKnob = getHighContrastColor(tvkKnob);
+              }
+              tCtx.fillStyle = tvkKnob;
               tCtx.fill();
             }
           }
@@ -8645,6 +8688,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   let isDraggingScrubber = false;
+  let isHoveringScrubber = false;
+
+  function updateScrubberHoverTooltip(e) {
+    if (!el.scrubberTrack) return;
+    let tooltip = document.getElementById('scrubber-tooltip');
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.id = 'scrubber-tooltip';
+      tooltip.className = 'scrubber-tooltip';
+      el.scrubberTrack.appendChild(tooltip);
+    }
+    const rect = el.scrubberTrack.getBoundingClientRect();
+    const padLeft = 5.5;
+    const trackWidth = rect.width - 2 * padLeft;
+    let pos = trackWidth > 0 ? (e.clientX - rect.left - padLeft) / trackWidth : 0;
+    pos = Math.max(0, Math.min(1, pos));
+    const dur = (el.nativeAudio && Number.isFinite(el.nativeAudio.duration) && el.nativeAudio.duration > 0)
+      ? el.nativeAudio.duration
+      : (state.currentTrack && Number.isFinite(state.currentTrack.duration) ? state.currentTrack.duration : 0);
+    const hoverTime = pos * dur;
+    tooltip.textContent = formatDuration(hoverTime);
+    const clampedX = Math.max(padLeft, Math.min(rect.width - padLeft, e.clientX - rect.left));
+    tooltip.style.left = `${clampedX}px`;
+    tooltip.classList.add('visible');
+  }
 
   function updateScrubberPositionFromEvent(e) {
     if (!el.scrubberTrack) return 0;
@@ -8660,10 +8728,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     state.scrubberDragTargetTime = targetTime;
     if (el.timeCurrent) el.timeCurrent.textContent = formatDuration(targetTime);
+    updateScrubberHoverTooltip(e);
     return targetTime;
   }
 
   if (el.scrubberTrack) {
+    el.scrubberTrack.addEventListener('mouseenter', (e) => {
+      isHoveringScrubber = true;
+      hasDrawnPausedFrame = false;
+      if (!animationFrameId) startVisualizers();
+      updateScrubberHoverTooltip(e);
+    });
+    el.scrubberTrack.addEventListener('mousemove', (e) => {
+      if (!isHoveringScrubber) isHoveringScrubber = true;
+      if (!animationFrameId) startVisualizers();
+      updateScrubberHoverTooltip(e);
+    });
+    el.scrubberTrack.addEventListener('mouseleave', () => {
+      isHoveringScrubber = false;
+      hasDrawnPausedFrame = false;
+      const tooltip = document.getElementById('scrubber-tooltip');
+      if (tooltip && !isDraggingScrubber) tooltip.classList.remove('visible');
+    });
     el.scrubberTrack.addEventListener('mousedown', (e) => {
       isDraggingScrubber = true;
       hasDrawnPausedFrame = false;
@@ -8681,6 +8767,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('mouseup', (e) => {
     if (!isDraggingScrubber || isDraggingTvkScrubber) return;
     isDraggingScrubber = false;
+    const tooltip = document.getElementById('scrubber-tooltip');
+    if (tooltip && !isHoveringScrubber) tooltip.classList.remove('visible');
     if (el.scrubberTrack) el.scrubberTrack.classList.remove('dragging');
     const targetTime = updateScrubberPositionFromEvent(e);
     if (!isNaN(targetTime) && el.nativeAudio) {
