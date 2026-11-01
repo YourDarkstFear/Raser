@@ -11343,13 +11343,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!tracks || tracks.length === 0) {
       container.style.paddingTop = '0px';
       container.style.paddingBottom = '0px';
-      const emptyMessages = {
-        search: 'No matching tracks. Try a different search',
-        favorites: 'No favourites yet. Use the heart on a track to save it',
-        playlist: 'This playlist is empty',
-        local: 'Your library is empty. Add some music to get started'
+      const emptyConfigs = {
+        search: {
+          badge: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>',
+          title: 'No matching tracks found',
+          sub: 'Try checking for typos or searching for a different track, artist, or album'
+        },
+        favorites: {
+          badge: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>',
+          title: 'No favorite tracks yet',
+          sub: 'Click the heart icon on any song to save it to your library'
+        },
+        playlist: {
+          badge: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>',
+          title: 'This playlist is empty',
+          sub: 'Add songs to this playlist from search results or your favorites'
+        },
+        queue: {
+          badge: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6.5h16M4 12h16M4 17.5h10"></path></svg>',
+          title: 'Playback queue is empty',
+          sub: 'Play a track or add songs to queue to start listening'
+        },
+        history: {
+          badge: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><polyline points="12 6.5 12 12 15.5 14"></polyline></svg>',
+          title: 'No recently played tracks',
+          sub: 'Songs you play will appear in your listening history'
+        },
+        local: {
+          badge: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
+          title: 'Your local library is empty',
+          sub: 'Add local audio files or folders to get started'
+        }
       };
-      container.innerHTML = `<div class="empty-hint">${emptyMessages[context] || 'No tracks to show'}</div>`;
+      const cfg = emptyConfigs[context] || {
+        badge: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="10" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+        title: 'No tracks to show',
+        sub: ''
+      };
+      container.innerHTML = `<div class="empty-hint empty-state-card">
+        <div class="empty-state-badge">${cfg.badge}</div>
+        <div class="empty-state-title">${cfg.title}</div>
+        ${cfg.sub ? `<div class="empty-state-sub">${cfg.sub}</div>` : ''}
+      </div>`;
       return;
     }
 
@@ -15613,6 +15648,36 @@ function bindCoverHoldZoom(wrapEl) {
     ]);
 
     allSelectors.forEach(sel => {
+      if (sel === '#nav-discover svg') {
+        const navDiscover = document.getElementById('nav-discover');
+        if (navDiscover) {
+          const img = navDiscover.querySelector('#nav-home-app-icon');
+          let elSvg = navDiscover.querySelector('svg.nav-discover-pack-svg');
+          if (pack === 'material') {
+            if (img) img.style.display = '';
+            if (elSvg) elSvg.remove();
+          } else {
+            const packDef = ICON_PACKS[pack];
+            if (packDef && packDef[sel]) {
+              if (img) img.style.display = 'none';
+              if (!elSvg) {
+                const indicator = navDiscover.querySelector('.nav-indicator') || navDiscover;
+                elSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                elSvg.setAttribute('width', '20');
+                elSvg.setAttribute('height', '20');
+                elSvg.setAttribute('viewBox', '0 0 24 24');
+                elSvg.setAttribute('fill', 'none');
+                elSvg.setAttribute('stroke', 'currentColor');
+                elSvg.setAttribute('stroke-width', '2');
+                elSvg.classList.add('nav-discover-pack-svg');
+                indicator.appendChild(elSvg);
+              }
+              elSvg.innerHTML = packDef[sel];
+            }
+          }
+        }
+        return;
+      }
       const elSvg = document.querySelector(sel);
       if (!elSvg) return;
       if (!elSvg.dataset.origSvg) {

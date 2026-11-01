@@ -266,34 +266,23 @@ body.perf .titlebar { transition: none !important; }
 .window-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   -webkit-app-region: no-drag !important;
   pointer-events: auto !important;
   z-index: 10002 !important;
   position: relative;
-}
-
-.window-controls,
-.win-btn {
-  -webkit-app-region: no-drag !important;
-  pointer-events: auto !important;
-  z-index: 10002 !important;
-  position: relative;
-  min-width: 42px;
   height: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .titlebar-btn {
   background: transparent;
   border: none;
   color: var(--md-sys-color-on-surface-variant);
-  width: 28px;
-  height: 28px;
-  border-radius: var(--md-shape-corner-full);
-  display: flex;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: var(--md-shape-corner-full, 9999px);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
@@ -301,6 +290,7 @@ body.perf .titlebar { transition: none !important; }
   pointer-events: auto !important;
   z-index: 10002 !important;
   position: relative;
+  transition: background-color var(--transition-hover), color var(--transition-hover);
 }
 
 .titlebar-btn:hover {
@@ -2810,6 +2800,45 @@ body.perf .lyric-gap-bars .gap-bar {
   color: var(--md-sys-color-outline);
   text-align: center;
   padding: 32px 0;
+}
+
+.empty-state-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  padding: 64px 24px !important;
+  text-align: center !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  user-select: none !important;
+}
+
+.empty-state-badge {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--md-sys-color-surface-container-high, rgba(255, 255, 255, 0.05));
+  color: var(--md-sys-color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.empty-state-title {
+  font-size: calc(16px * var(--font-scale, 1));
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+
+.empty-state-sub {
+  font-size: calc(13px * var(--font-scale, 1));
+  color: var(--md-sys-color-outline);
+  max-width: 360px;
+  line-height: 1.5;
 }
 .lyrics-empty-icon {
   display: flex;
@@ -7494,7 +7523,7 @@ body.mini.mini-lyrics-on #btn-mini-lyrics {
 .m3-dropdown-option { min-height: 40px; }
 
 .ripple-host { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
-.ripple { position: absolute; border-radius: 50%;  blur: 5; background: currentColor; opacity: 0; transform: scale(0); animation: rippleOut .55s cubic-bezier(.2, 0, 0, 1) forwards; filter: blur(2px); }
+.ripple { position: absolute; border-radius: 50%; background: currentColor; opacity: 0; transform: scale(0); animation: rippleOut .55s cubic-bezier(.2, 0, 0, 1) forwards; filter: blur(2px); }
 @keyframes rippleOut { 0% { transform: scale(0); opacity: .16; } 100% { transform: scale(1); opacity: 0; } }
 
 @property --hl { syntax: '<percentage>'; inherits: false; initial-value: 0%; }
