@@ -2,6 +2,20 @@
 (function (global) {
   'use strict';
 
+  const EQ_PRESETS = Object.freeze({
+    flat: { name: 'Flat', bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+    bass_boost: { name: 'Bass Boost', bands: [6, 5, 4, 2, 0, 0, 0, 0, 0, 0] },
+    treble_boost: { name: 'Treble Boost', bands: [0, 0, 0, 0, 0, 1, 2, 4, 6, 6] },
+    vocal_boost: { name: 'Vocal Booster', bands: [-2, -2, -1, 1, 3, 4, 3, 1, 0, -1] },
+    rock: { name: 'Rock', bands: [5, 3, 2, -1, -2, 0, 2, 4, 5, 5] },
+    pop: { name: 'Pop', bands: [-1, 1, 3, 4, 3, 0, -1, 1, 3, 3] },
+    electronic: { name: 'Electronic / Dance', bands: [5, 4, 2, 0, -2, 2, 1, 2, 4, 5] },
+    jazz: { name: 'Jazz', bands: [3, 2, 0, 2, -1, -1, 0, 1, 3, 3] },
+    classical: { name: 'Classical', bands: [4, 3, 2, 1, -1, -1, 0, 2, 3, 4] },
+    acoustic: { name: 'Acoustic', bands: [3, 2, 1, 1, 2, 2, 2, 3, 3, 2] },
+    hiphop: { name: 'Hip-Hop', bands: [6, 5, 2, 1, -1, -1, 1, -1, 2, 3] }
+  });
+
   class RiffAudioEngine {
     constructor() {
       this.ctx = null;
@@ -838,6 +852,12 @@
     }
   }
 
+  RiffAudioEngine.EQ_PRESETS = EQ_PRESETS;
   global.RaserAudioEngine = global.RiffAudioEngine = RiffAudioEngine;
+  global.EQ_PRESETS = EQ_PRESETS;
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { RaserAudioEngine: RiffAudioEngine, RiffAudioEngine, EQ_PRESETS };
+  }
 
 })(typeof window !== 'undefined' ? window : globalThis);

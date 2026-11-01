@@ -7585,6 +7585,10 @@ body.highlight-buttons .btn-pill-primary { background: var(--md-sys-color-primar
 
 .eq-section-10band { margin-top: 14px; border-top: 1px solid var(--md-sys-color-outline-variant); padding-top: 12px; display: flex; flex-direction: column; }
 .eq-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.eq-presets-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.eq-preset-chip { background: var(--md-sys-color-surface-container-highest); border: none; border-radius: var(--md-shape-corner-full); padding: 5px 10px; font-size: calc(11px * var(--font-scale, 1)); font-weight: 500; color: var(--md-sys-color-on-surface-variant); cursor: pointer; user-select: none; }
+.eq-preset-chip:hover { background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); }
+.eq-preset-chip.active { background: var(--md-sys-color-primary) !important; color: var(--md-sys-color-on-primary) !important; }
 .eq-faders-container { display: flex; align-items: flex-start; gap: 8px; width: 100%; position: relative; }
 .eq-scale { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; height: 180px; padding: 6px 4px 6px 0; font-size: calc(11px * var(--font-scale, 1)); font-variant-numeric: tabular-nums; color: var(--md-sys-color-on-surface-variant); user-select: none; flex-shrink: 0; min-width: 24px; box-sizing: border-box; }
 .eq-faders-area { flex: 1; min-width: 0; position: relative; }

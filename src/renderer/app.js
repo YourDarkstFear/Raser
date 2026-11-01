@@ -2027,6 +2027,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                           sliderEqHigh: document.getElementById('slider-eq-high'),
                           valEqHigh: document.getElementById('val-eq-high'),
                           eqBands: document.getElementById('eq-bands'),
+                          eqPresetsChips: document.getElementById('eq-presets-chips'),
                           btnResetEqBands: document.getElementById('btn-reset-eq-bands'),
                           btnResetAudio: document.getElementById('btn-reset-audio'),
 
@@ -3692,6 +3693,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateWrap(input);
         if (valLabels[i]) valLabels[i].textContent = `${v > 0 ? '+' : ''}${v} dB`;
       });
+    }
+    if (typeof updateEqPresetChipsHighlight === 'function') {
+      updateEqPresetChipsHighlight();
     }
 
     if (state.hqSettings) {
@@ -14927,6 +14931,82 @@ function bindCoverHoldZoom(wrapEl) {
   function init10BandEqUI() {
     if (!el.eqBands) return;
 
+    const EQ_PRESETS = (window.EQ_PRESETS || (window.RaserAudioEngine && window.RaserAudioEngine.EQ_PRESETS)) || {
+      flat: { name: 'Flat', bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+      bass_boost: { name: 'Bass Boost', bands: [6, 5, 4, 2, 0, 0, 0, 0, 0, 0] },
+      treble_boost: { name: 'Treble Boost', bands: [0, 0, 0, 0, 0, 1, 2, 4, 6, 6] },
+      vocal_boost: { name: 'Vocal Booster', bands: [-2, -2, -1, 1, 3, 4, 3, 1, 0, -1] },
+      rock: { name: 'Rock', bands: [5, 3, 2, -1, -2, 0, 2, 4, 5, 5] },
+      pop: { name: 'Pop', bands: [-1, 1, 3, 4, 3, 0, -1, 1, 3, 3] },
+      electronic: { name: 'Electronic / Dance', bands: [5, 4, 2, 0, -2, 2, 1, 2, 4, 5] },
+      jazz: { name: 'Jazz', bands: [3, 2, 0, 2, -1, -1, 0, 1, 3, 3] },
+      classical: { name: 'Classical', bands: [4, 3, 2, 1, -1, -1, 0, 2, 3, 4] },
+      acoustic: { name: 'Acoustic', bands: [3, 2, 1, 1, 2, 2, 2, 3, 3, 2] },
+      hiphop: { name: 'Hip-Hop', bands: [6, 5, 2, 1, -1, -1, 1, -1, 2, 3] }
+    };
+
+    function updateEqPresetChipsHighlight() {
+      if (!el.eqPresetsChips) return;
+      const currentBands = state.audioSettings.eqBands || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+      let matchedKey = null;
+      for (const [key, preset] of Object.entries(EQ_PRESETS)) {
+        if (preset.bands.every((b, idx) => (currentBands[idx] || 0) === b)) {
+          matchedKey = key;
+          break;
+        }
+      }
+      state.activeEqPreset = matchedKey;
+      el.eqPresetsChips.querySelectorAll('.eq-preset-chip').forEach(chip => {
+        chip.classList.toggle('active', chip.dataset.eqPreset === matchedKey);
+      });
+    }
+    window.updateEqPresetChipsHighlight = updateEqPresetChipsHighlight;
+
+    function applyEqPreset(presetKey) {
+      initAudioContext();
+      const preset = EQ_PRESETS[presetKey];
+      if (!preset) return;
+      state.activeEqPreset = presetKey;
+      state.audioSettings.eqBands = [...preset.bands];
+      if (audioEngine && audioEngine.setEqBands) {
+        audioEngine.setEqBands(state.audioSettings.eqBands);
+      }
+      if (el.eqBands) {
+        const inputs = el.eqBands.querySelectorAll('.eq-band-range');
+        const valLabels = el.eqBands.querySelectorAll('.eq-band-val');
+        inputs.forEach((input, i) => {
+          const val = preset.bands[i] || 0;
+          input.value = String(val);
+          if (valLabels[i]) valLabels[i].textContent = `${val > 0 ? '+' : ''}${val} dB`;
+        });
+      }
+      updateEqPresetChipsHighlight();
+      state.activePresetId = null;
+      applyAudioSettings();
+      renderPresets();
+    }
+    window.applyEqPreset = applyEqPreset;
+
+    function renderEqPresetChips() {
+      if (!el.eqPresetsChips) return;
+      el.eqPresetsChips.innerHTML = '';
+      Object.entries(EQ_PRESETS).forEach(([key, preset]) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'eq-preset-chip';
+        chip.dataset.eqPreset = key;
+        chip.textContent = preset.name;
+        chip.addEventListener('click', () => {
+          applyEqPreset(key);
+        });
+        el.eqPresetsChips.appendChild(chip);
+      });
+      updateEqPresetChipsHighlight();
+    }
+    window.renderEqPresetChips = renderEqPresetChips;
+
+    renderEqPresetChips();
+
     el.eqBands.innerHTML = '';
     const currentBands = state.audioSettings.eqBands || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     EQ_BAND_LABELS.forEach((freqLabel, i) => {
@@ -14963,6 +15043,7 @@ function bindCoverHoldZoom(wrapEl) {
         state.audioSettings.eqBands[i] = val;
         valSpan.textContent = `${val > 0 ? '+' : ''}${val} dB`;
         state.activePresetId = null;
+        updateEqPresetChipsHighlight();
         applyAudioSettings();
         renderPresets();
       });
@@ -14976,6 +15057,7 @@ function bindCoverHoldZoom(wrapEl) {
         state.audioSettings.eqBands[i] = 0;
         valSpan.textContent = '0 dB';
         state.activePresetId = null;
+        updateEqPresetChipsHighlight();
         applyAudioSettings();
         renderPresets();
       });
@@ -14997,6 +15079,7 @@ function bindCoverHoldZoom(wrapEl) {
           if (valLabels[i]) valLabels[i].textContent = '0 dB';
         });
         state.activePresetId = null;
+        updateEqPresetChipsHighlight();
         applyAudioSettings();
         renderPresets();
       });
