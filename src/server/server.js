@@ -7,7 +7,22 @@ const keepAliveHttpsAgent = new https.Agent({
   maxFreeSockets: 10,
   family: 4
 });
-const url = require('url');
+function parseRequestUrl(rawUrl) {
+  if (!rawUrl) return { pathname: '', search: '', query: {}, searchParams: new URLSearchParams(), href: '' };
+  try {
+    const urlObj = new URL(rawUrl, 'http://127.0.0.1');
+    const query = Object.fromEntries(urlObj.searchParams.entries());
+    return {
+      pathname: urlObj.pathname,
+      search: urlObj.search,
+      searchParams: urlObj.searchParams,
+      query,
+      href: urlObj.href
+    };
+  } catch (_) {
+    return { pathname: '', search: '', query: {}, searchParams: new URLSearchParams(), href: '' };
+  }
+}
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -2702,7 +2717,7 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
   };
   artist = stripYoutubeTopic(artist);
   trackUrl = normalizeSoundCloudUrl(trackUrl);
-  const parsedUrl = (req && req.url) ? url.parse(req.url, true) : { query: {} };
+  const parsedUrl = (req && req.url) ? parseRequestUrl(req.url) : { pathname: '', search: '', query: {}, searchParams: new URLSearchParams(), href: '' };
   const forShare = Boolean(parsedUrl.query && parsedUrl.query.forShare === '1');
   const forceYtDlp = Boolean(parsedUrl.query && parsedUrl.query.forceYtDlp === '1');
   const quality = (parsedUrl.query && parsedUrl.query.quality) || 'medium';
@@ -4002,7 +4017,7 @@ async function handleDownload(req, res, trackUrl, title, artist, format = 'mp3',
   }
 
   const isRaw = Boolean(raw);
-  const parsedUrl = (req && req.url) ? url.parse(req.url, true) : { query: {} };
+  const parsedUrl = (req && req.url) ? parseRequestUrl(req.url) : { pathname: '', search: '', query: {}, searchParams: new URLSearchParams(), href: '' };
   const album = albumParam || (parsedUrl.query && parsedUrl.query.album) || '';
   let downloadsDir = getDownloadsDir();
   const customDir = parsedUrl.query && parsedUrl.query.customDir;
@@ -7793,7 +7808,7 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
 
-  const parsedUrl = url.parse(req.url, true);
+  const parsedUrl = parseRequestUrl(req.url);
   const pathname = parsedUrl.pathname;
 
   if (pathname.startsWith('/api/lastfm/')) { handleLastFmRoute(req, res, pathname); return; }
