@@ -2625,13 +2625,14 @@ function transliterateCyrillic(str) {
     'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
     'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
     'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
-    'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
+    'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+    'і': 'i', 'ї': 'yi', 'є': 'ye', 'ґ': 'g', 'ў': 'u'
   };
-  return String(str || '').replace(/[а-яё]/gi, ch => {
+  return String(str || '').replace(/[а-яёіїєґў]/gi, ch => {
     const lower = ch.toLowerCase();
     const mapped = map[lower];
     if (mapped === undefined) return ch;
-    return ch === lower ? mapped : mapped.toUpperCase();
+    return ch === lower ? mapped : (mapped.length > 1 ? mapped[0].toUpperCase() + mapped.slice(1) : mapped.toUpperCase());
   });
 }
 
@@ -2640,12 +2641,36 @@ function transliterateGreek(str) {
     'α': 'a', 'β': 'b', 'γ': 'g', 'δ': 'd', 'ε': 'e', 'ζ': 'z', 'η': 'i',
     'θ': 'th', 'ι': 'i', 'κ': 'k', 'λ': 'l', 'μ': 'm', 'ν': 'n', 'ξ': 'x',
     'ο': 'o', 'π': 'p', 'ρ': 'r', 'σ': 's', 'ς': 's', 'τ': 't', 'υ': 'y',
-    'φ': 'f', 'χ': 'ch', 'ψ': 'ps', 'ω': 'o'
+    'φ': 'f', 'χ': 'ch', 'ψ': 'ps', 'ω': 'o',
+    'ά': 'a', 'έ': 'e', 'ή': 'i', 'ί': 'i', 'ϊ': 'i', 'ΐ': 'i',
+    'ό': 'o', 'ύ': 'y', 'ϋ': 'y', 'ΰ': 'y', 'ώ': 'o'
   };
-  return String(str || '').replace(/[α-ωά-ώ]/gi, ch => {
+  let s = String(str || '');
+  s = s.replace(/ου/gi, 'ou')
+       .replace(/ού/gi, 'ou')
+       .replace(/μπ/gi, 'b')
+       .replace(/ντ/gi, 'nt')
+       .replace(/γκ/gi, 'gk');
+  return s.replace(/[α-ωά-ώΐΰϊϋ]/gi, ch => {
     const lower = ch.toLowerCase();
-    return map[lower] || ch;
+    const mapped = map[lower];
+    if (mapped === undefined) return ch;
+    return ch === lower ? mapped : (mapped.length > 1 ? mapped[0].toUpperCase() + mapped.slice(1) : mapped.toUpperCase());
   });
+}
+
+function transliterateArabic(str) {
+  const map = {
+    '\u0621': '', '\u0622': 'a', '\u0623': 'a', '\u0624': 'w', '\u0625': 'i', '\u0626': 'y',
+    '\u0627': 'a', '\u0628': 'b', '\u0629': 'h', '\u062a': 't', '\u062b': 'th', '\u062c': 'j',
+    '\u062d': 'h', '\u062e': 'kh', '\u062f': 'd', '\u0630': 'dh', '\u0631': 'r', '\u0632': 'z',
+    '\u0633': 's', '\u0634': 'sh', '\u0635': 's', '\u0636': 'd', '\u0637': 't', '\u0638': 'z',
+    '\u0639': 'a', '\u063a': 'gh', '\u0641': 'f', '\u0642': 'q', '\u0643': 'k', '\u0644': 'l',
+    '\u0645': 'm', '\u0646': 'n', '\u0647': 'h', '\u0648': 'w', '\u0649': 'a', '\u064a': 'y',
+    '\u0671': 'a', '\u06a9': 'k', '\u06af': 'g', '\u067e': 'p', '\u0686': 'ch', '\u0698': 'zh',
+    '\u06cc': 'y'
+  };
+  return String(str || '').replace(/[\u0621-\u064a\u0671\u067e\u0686\u0698\u06a9\u06af\u06cc]/g, ch => map[ch] !== undefined ? map[ch] : ch);
 }
 
 function transliterateText(s) {
@@ -2669,6 +2694,7 @@ function transliterateText(s) {
     .replace(/\u06a9/g, '\u0643')
     .replace(/[\u0629\u06c1]/g, '\u0647')
     .replace(/[\u0622\u0623\u0625\u0671]/g, '\u0627');
+  str = transliterateArabic(str);
   return str;
 }
 
@@ -2704,6 +2730,9 @@ function artistsMatch(targetArt, candArt) {
   const cNorm = normText(candArt);
   if (tNorm && cNorm) {
     if (tNorm === cNorm || cNorm.includes(tNorm) || tNorm.includes(cNorm)) return true;
+    const tV = tNorm.replace(/y/g, 'i');
+    const cV = cNorm.replace(/y/g, 'i');
+    if (tV === cV || cV.includes(tV) || tV.includes(cV)) return true;
   }
   const tRaw = String(targetArt).toLowerCase().trim();
   const cRaw = String(candArt).toLowerCase().trim();
@@ -2730,9 +2759,11 @@ function scoreImportedCandidate(targetTitle, targetArtist, targetDur, cand) {
 
   // 1. ŞARKI İSMİ KONTROLÜ (Deep Title Match)
   if (tTitleClean && cTitleClean) {
-    if (tTitleClean === cTitleClean) {
+    const tY = tTitleClean.replace(/y/g, 'i');
+    const cY = cTitleClean.replace(/y/g, 'i');
+    if (tTitleClean === cTitleClean || tY === cY) {
       score += 65;
-    } else if (cTitleClean.includes(tTitleClean) || tTitleClean.includes(cTitleClean)) {
+    } else if (cTitleClean.includes(tTitleClean) || tTitleClean.includes(cTitleClean) || cY.includes(tY) || tY.includes(cY)) {
       score += 45;
     } else {
       const tWords = tTitleClean.split(' ').filter(w => w.length > 1);
@@ -5862,6 +5893,40 @@ function fetchSpotifyEmbed(playlistId, ua) {
   });
 }
 
+
+function extractJsonObject(str, keywords = ['pageProps', 'trackList', 'entity']) {
+  if (!keywords.some(k => str.includes(k))) return null;
+  let depth = 0;
+  let inStr = false;
+  let quote = '';
+  let escaped = false;
+  let jsonStart = -1;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (inStr) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === quote) inStr = false;
+    } else {
+      if (ch === '\"' || ch === "'") {
+        inStr = true;
+        quote = ch;
+        escaped = false;
+      } else if (ch === '{') {
+        if (depth === 0) jsonStart = i;
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0 && jsonStart !== -1) {
+          const candidate = str.slice(jsonStart, i + 1);
+          if (keywords.some(k => candidate.includes(k))) return candidate;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 async function handleSpotifyImport(req, res, inputUrl) {
   const m = (inputUrl || '').match(/^(?:(?:https:\/\/)?open\.spotify\.com\/(?:embed\/)?playlist\/|spotify:playlist:)([a-zA-Z0-9]{22})(?:[/?#]|$)/);
   if (!m) {
@@ -5938,9 +6003,17 @@ async function handleSpotifyImport(req, res, inputUrl) {
     }
 
     if (!rawJson) {
-      const fallbackMatch = body.match(/(\{(?:[^{}]|"(?:\\.|[^"\\])*")*"(?:pageProps|trackList|entity)"[\s\S]*?\})\s*<\/script>/);
-      if (fallbackMatch && fallbackMatch[1]) {
-        rawJson = fallbackMatch[1];
+      const scriptTagRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+      let sm;
+      while ((sm = scriptTagRegex.exec(body)) !== null) {
+        const content = sm[1];
+        if (content && (content.includes('pageProps') || content.includes('trackList') || content.includes('entity'))) {
+          const extracted = extractJsonObject(content, ['pageProps', 'trackList', 'entity']);
+          if (extracted) {
+            rawJson = extracted;
+            break;
+          }
+        }
       }
     }
 
@@ -6074,7 +6147,17 @@ async function handleSpotifyImport(req, res, inputUrl) {
       return res.end(JSON.stringify({ success: false, code: isPriv ? 'spotify_forbidden' : 'spotify_error', error: isPriv ? 'Private playlist' : 'Could not read tracks' }));
     }
 
-    if (limited && (!Array.isArray(entity?.trackList) || !Number.isInteger(entity.totalCount) || entity.totalCount > entity.trackList.length || entity.trackList.length > 100)) {
+    const hasLegacyTrackList = Array.isArray(entity?.trackList);
+    const rawTrackCount = hasLegacyTrackList ? entity.trackList.length : (candidateTrackList.length || tracks.length);
+    const expectedTotal = Number.isInteger(entity?.totalCount)
+      ? entity.totalCount
+      : (Number.isInteger(entity?.tracks?.total) ? entity.tracks.total : (Number.isInteger(total) ? total : rawTrackCount));
+
+    const isIncomplete = hasLegacyTrackList
+      ? (!Number.isInteger(entity.totalCount) || entity.totalCount > entity.trackList.length || entity.trackList.length > 100)
+      : (rawTrackCount === 0 || (Number.isInteger(expectedTotal) && expectedTotal > rawTrackCount) || rawTrackCount > 100);
+
+    if (limited && isIncomplete) {
       res.writeHead(409, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ success: false, code: 'spotify_incomplete', error: 'Spotify exposed only part of this playlist. Connect your account or use Export files.' }));
     }
