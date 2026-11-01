@@ -2581,8 +2581,62 @@ async function handleTrending(req, res) {
   res.end(JSON.stringify({ success: true, tracks: tracks || [] }));
 }
 
+function transliterateCyrillic(str) {
+  const map = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
+    'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+    'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+    'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
+  };
+  return String(str || '').replace(/[а-яё]/gi, ch => {
+    const lower = ch.toLowerCase();
+    const mapped = map[lower];
+    if (mapped === undefined) return ch;
+    return ch === lower ? mapped : mapped.toUpperCase();
+  });
+}
+
+function transliterateGreek(str) {
+  const map = {
+    'α': 'a', 'β': 'b', 'γ': 'g', 'δ': 'd', 'ε': 'e', 'ζ': 'z', 'η': 'i',
+    'θ': 'th', 'ι': 'i', 'κ': 'k', 'λ': 'l', 'μ': 'm', 'ν': 'n', 'ξ': 'x',
+    'ο': 'o', 'π': 'p', 'ρ': 'r', 'σ': 's', 'ς': 's', 'τ': 't', 'υ': 'y',
+    'φ': 'f', 'χ': 'ch', 'ψ': 'ps', 'ω': 'o'
+  };
+  return String(str || '').replace(/[α-ωά-ώ]/gi, ch => {
+    const lower = ch.toLowerCase();
+    return map[lower] || ch;
+  });
+}
+
+function transliterateText(s) {
+  if (!s) return '';
+  let str = String(s).normalize('NFKC');
+  str = transliterateCyrillic(str);
+  str = transliterateGreek(str);
+  str = str
+    .replace(/æ/gi, 'ae')
+    .replace(/œ/gi, 'oe')
+    .replace(/ø/gi, 'o')
+    .replace(/ß/g, 'ss')
+    .replace(/ð/gi, 'd')
+    .replace(/þ/gi, 'th')
+    .replace(/ł/gi, 'l')
+    .replace(/đ/gi, 'd');
+  str = str.normalize('NFKD')
+    .replace(/[\u0300-\u036f\u0591-\u05c7\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/g, '')
+    .replace(/\u0640/g, '')
+    .replace(/[\u06cc\u0649]/g, '\u064a')
+    .replace(/\u06a9/g, '\u0643')
+    .replace(/[\u0629\u06c1]/g, '\u0647')
+    .replace(/[\u0622\u0623\u0625\u0671]/g, '\u0627');
+  return str;
+}
+
 function normText(s) {
-  return String(s || '').toLowerCase()
+  return transliterateText(String(s || ''))
+    .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -2604,6 +2658,19 @@ function extractArtists(str) {
     .split(/[,;&\/]|(?:\s+(?:feat\.?|ft\.?|featuring|with|x)\s+)/i)
     .map(a => normText(a))
     .filter(a => a.length > 0 && a !== 'unknown artist');
+}
+
+function artistsMatch(targetArt, candArt) {
+  if (!targetArt || !candArt) return false;
+  const tNorm = normText(targetArt);
+  const cNorm = normText(candArt);
+  if (tNorm && cNorm) {
+    if (tNorm === cNorm || cNorm.includes(tNorm) || tNorm.includes(cNorm)) return true;
+  }
+  const tRaw = String(targetArt).toLowerCase().trim();
+  const cRaw = String(candArt).toLowerCase().trim();
+  if (tRaw && cRaw && (tRaw === cRaw || cRaw.includes(tRaw) || tRaw.includes(cRaw))) return true;
+  return false;
 }
 
 function scoreImportedCandidate(targetTitle, targetArtist, targetDur, cand) {
@@ -2643,10 +2710,10 @@ function scoreImportedCandidate(targetTitle, targetArtist, targetDur, cand) {
   // 2. SANATÇI / ŞARKICI KONTROLÜ (Deep Artist Match)
   if (primaryTArtist) {
     let artistMatched = false;
-    if (cArtistNorm === primaryTArtist || cArtistNorm.includes(primaryTArtist) || primaryTArtist.includes(cArtistNorm)) {
+    if (cArtistNorm === primaryTArtist || cArtistNorm.includes(primaryTArtist) || primaryTArtist.includes(cArtistNorm) || artistsMatch(primaryTArtist, cArtistNorm)) {
       score += 50;
       artistMatched = true;
-    } else if (cFullNorm.includes(primaryTArtist)) {
+    } else if (cFullNorm.includes(primaryTArtist) || artistsMatch(primaryTArtist, cFullNorm)) {
       score += 35;
       artistMatched = true;
     }
@@ -2654,7 +2721,7 @@ function scoreImportedCandidate(targetTitle, targetArtist, targetDur, cand) {
     if (tArtists.length > 1) {
       for (let i = 1; i < tArtists.length; i++) {
         const secArtist = tArtists[i];
-        if (secArtist && (cFullNorm.includes(secArtist) || cArtistNorm.includes(secArtist))) {
+        if (secArtist && (cFullNorm.includes(secArtist) || cArtistNorm.includes(secArtist) || artistsMatch(secArtist, cFullNorm) || artistsMatch(secArtist, cArtistNorm))) {
           score += 15;
           artistMatched = true;
         }
@@ -5803,21 +5870,72 @@ async function handleSpotifyImport(req, res, inputUrl) {
 
   try {
     const body = embedRes.body;
-    const nextDataMatch = body.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-    if (!nextDataMatch) {
+    let data = null;
+    let rawJson = '';
+
+    const scriptPatterns = [
+      /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i,
+      /<script id="initial-state"[^>]*>([\s\S]*?)<\/script>/i,
+      /<script id="session"[^>]*>([\s\S]*?)<\/script>/i,
+      /<script[^>]*type="application\/json"[^>]*>([\s\S]*?)<\/script>/gi
+    ];
+
+    for (const pat of scriptPatterns) {
+      if (pat.global) {
+        let m;
+        while ((m = pat.exec(body)) !== null) {
+          if (m[1] && (m[1].includes('props') || m[1].includes('trackList') || m[1].includes('spotify:track') || m[1].includes('entity'))) {
+            rawJson = m[1];
+            break;
+          }
+        }
+      } else {
+        const m = body.match(pat);
+        if (m && m[1]) {
+          rawJson = m[1];
+          break;
+        }
+      }
+      if (rawJson) break;
+    }
+
+    if (!rawJson) {
+      const fallbackMatch = body.match(/(\{(?:[^{}]|"(?:\\.|[^"\\])*")*"(?:pageProps|trackList|entity)"[\s\S]*?\})\s*<\/script>/);
+      if (fallbackMatch && fallbackMatch[1]) {
+        rawJson = fallbackMatch[1];
+      }
+    }
+
+    if (rawJson) {
+      try {
+        data = JSON.parse(rawJson);
+      } catch (_) {
+        try {
+          const unescaped = rawJson
+            .replace(/&quot;/g, '"')
+            .replace(/&amp;/g, '&')
+            .replace(/&#39;/g, "'")
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&#x27;/g, "'");
+          data = JSON.parse(unescaped);
+        } catch (_) {}
+      }
+    }
+
+    if (!data) {
       const isPriv = /private/i.test(body);
       res.writeHead(403, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ success: false, code: isPriv ? 'spotify_forbidden' : 'spotify_error', error: isPriv ? 'Private playlist' : 'Could not parse playlist' }));
     }
 
-    const data = JSON.parse(nextDataMatch[1]);
-    const pageProps = data?.props?.pageProps;
+    const pageProps = data?.props?.pageProps || data?.pageProps || data;
     if (pageProps?.status === 404) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ success: false, code: 'spotify_not_found', error: 'Playlist not found' }));
     }
 
-    const entity = pageProps?.state?.data?.entity;
+    const entity = pageProps?.state?.data?.entity || pageProps?.entity || data?.entity;
     const name = entity?.name || pageProps?.title || 'Spotify Playlist';
     const ogMatch = body.match(/<meta\s+(?:property|name)=["'](?:og:image|twitter:image)["']\s+content=["']([^"']+)["']/i);
     let cover = (entity?.images && Array.isArray(entity.images) && entity.images[0]?.url) ||
@@ -5829,7 +5947,7 @@ async function handleSpotifyImport(req, res, inputUrl) {
 
     let tracks = [];
     let limited = false;
-    const accessToken = pageProps?.state?.settings?.session?.accessToken;
+    const accessToken = pageProps?.state?.settings?.session?.accessToken || data?.session?.accessToken || pageProps?.session?.accessToken;
     let total = 0;
     if (accessToken) {
       try {
@@ -5850,8 +5968,12 @@ async function handleSpotifyImport(req, res, inputUrl) {
     }
 
     if (!tracks.length) {
-      if (Array.isArray(entity?.trackList) && entity.trackList.length > 0) {
-        tracks = entity.trackList.slice(0, 100).map(t => {
+      const candidateTrackList = Array.isArray(entity?.trackList) && entity.trackList.length > 0 ? entity.trackList :
+                                 (Array.isArray(entity?.tracks?.items) ? entity.tracks.items.map(i => i.track || i) :
+                                 (Array.isArray(entity?.tracks) ? entity.tracks : []));
+
+      if (candidateTrackList.length > 0) {
+        tracks = candidateTrackList.slice(0, 100).map(t => {
           const duration = typeof t.duration === 'number' ? Math.round(t.duration / 1000) : (typeof t.duration_ms === 'number' ? Math.round(t.duration_ms / 1000) : 0);
           const trackCover = t.image || t.coverArt?.sources?.[0]?.url || '';
           const spotifyId = spotifyTrackId(t);
@@ -5860,7 +5982,7 @@ async function handleSpotifyImport(req, res, inputUrl) {
             spotifyId,
             spotifyUrl: spotifyId ? `https://open.spotify.com/track/${spotifyId}` : '',
             title: (t.title || t.name || '').trim(),
-            artist: (t.subtitle || t.artist || '').trim(),
+            artist: (t.subtitle || t.artist || (Array.isArray(t.artists) ? t.artists.map(a => typeof a === 'string' ? a : (a.name || a.profile?.name)).filter(Boolean).join(', ') : '')).trim(),
             duration,
             thumbnail: trackCover,
             cover: trackCover
@@ -5872,17 +5994,18 @@ async function handleSpotifyImport(req, res, inputUrl) {
         function walk(node) {
           if (!node || typeof node !== 'object') return;
           if (Array.isArray(node)) { for (const item of node) walk(item); return; }
-          const uri = typeof node.uri === 'string' ? node.uri : '';
-          const title = node.title || node.name;
-          const subtitle = node.subtitle || node.artist || (Array.isArray(node.artists) ? node.artists.map(a => typeof a === 'string' ? a : (a.name || a.profile?.name)).filter(Boolean).join(', ') : (node.albumOfTrack?.artists?.items || []).map(a => a.profile?.name).filter(Boolean).join(', '));
-          const duration = node.duration?.totalMilliseconds || node.trackDuration?.totalMilliseconds || node.duration_ms || (typeof node.duration === 'number' ? node.duration : 0);
-          if (title && typeof title === 'string' && (subtitle || uri.startsWith('spotify:track:')) && (uri.startsWith('spotify:track:') || node.entityType === 'track' || duration)) {
+          const target = (node.track || node.item || node);
+          const uri = typeof target.uri === 'string' ? target.uri : (typeof node.uri === 'string' ? node.uri : '');
+          const title = target.title || target.name || target.trackName || node.title || node.name;
+          const subtitle = target.subtitle || target.artist || (Array.isArray(target.artists) ? target.artists.map(a => typeof a === 'string' ? a : (a.name || a.profile?.name)).filter(Boolean).join(', ') : (target.artists?.items ? target.artists.items.map(a => a.profile?.name || a.name).filter(Boolean).join(', ') : (target.albumOfTrack?.artists?.items || []).map(a => a.profile?.name).filter(Boolean).join(', ')));
+          const duration = target.duration?.totalMilliseconds || target.trackDuration?.totalMilliseconds || target.duration_ms || target.durationMs || (typeof target.duration === 'number' ? target.duration : (node.duration?.totalMilliseconds || node.duration_ms || 0));
+          if (title && typeof title === 'string' && (subtitle || uri.startsWith('spotify:track:')) && (uri.startsWith('spotify:track:') || target.entityType === 'track' || duration)) {
             const key = `${title}__${subtitle || ''}`;
             if (!seen.has(key)) {
               seen.add(key);
               const durSec = typeof duration === 'number' ? (duration > 1000 ? Math.round(duration / 1000) : Math.round(duration)) : 0;
-              const trackCover = node.image || node.coverArt?.sources?.[0]?.url || '';
-              const spotifyId = spotifyTrackId(node);
+              const trackCover = target.image || target.coverArt?.sources?.[0]?.url || '';
+              const spotifyId = spotifyTrackId(target);
               tracks.push({
                 id: spotifyId,
                 spotifyId,
