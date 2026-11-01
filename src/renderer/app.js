@@ -14595,6 +14595,11 @@ function bindCoverHoldZoom(wrapEl) {
       persistVolumeState();
       applyAudioSettings();
     });
+    volGroup.addEventListener('mouseleave', () => {
+      if (document.activeElement === el.volumeSlider) el.volumeSlider.blur();
+    });
+    el.volumeSlider.addEventListener('change', () => el.volumeSlider.blur());
+    el.volumeSlider.addEventListener('pointerup', () => el.volumeSlider.blur());
   }
 
   if (el.btnVolumeMute) {

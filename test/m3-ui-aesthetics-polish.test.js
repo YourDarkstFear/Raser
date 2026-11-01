@@ -131,8 +131,8 @@ test('Suite 5: Feature 16 (E5) - Acrylic Frosted Glass Playbar', async (t) => {
     assert.match(stylesContent, /body:not\(\.classic-sidebar\):not\(\.mini\)\s+\.playbar\s*\{[\s\S]*?-webkit-backdrop-filter:\s*blur\(20px\)\s+saturate\(1\.8\)\s*!important/);
   });
 
-  await t.test('styles.css adds top hairline highlight to frosted playbar', () => {
-    assert.match(stylesContent, /border-top:\s*1px\s+solid\s+var\(--md-sys-color-outline-variant/);
+  await t.test('styles.css keeps frosted playbar borderless without harsh outline', () => {
+    assert.match(stylesContent, /body:not\(\.classic-sidebar\):not\(\.mini\)\s+\.playbar\s*\{[\s\S]*?border-top:\s*none\s*!important/);
   });
 
   await t.test('styles.css disables backdrop blur in performance mode', () => {
