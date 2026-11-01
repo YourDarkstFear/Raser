@@ -4270,8 +4270,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (track && !track._errorRetryStage) track._errorRetryStage = 0;
     if (track && track.artist) track.artist = stripYoutubeTopic(track.artist);
     if (track && track.platform !== 'soundcloud' && /^(?:sp_|dz_|it_|ym_|cand_)/i.test(String(track.id || ''))) {
-      delete track._preloadedStreamUrl;
-      delete track._preloadedStreamQuality;
+      if (track._errorRetryStage > 0) {
+        delete track._preloadedStreamUrl;
+        delete track._preloadedStreamQuality;
+      }
     }
     preloadedTrack10sFired = false;
     lastDisplayedSec = -1;

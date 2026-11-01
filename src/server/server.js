@@ -2889,7 +2889,7 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
               '--no-config', '-g', '--no-warnings', '--no-playlist', '--no-check-certificates',
               '--js-runtimes', 'node', '--remote-components', 'ejs:github',
               '--socket-timeout', '6', '--retries', '1',
-              ...(attempt.clientSpec && attempt.clientSpec !== 'default' ? ['--extractor-args', 'youtube:player_client=' + attempt.clientSpec] : []),
+              ...(attempt.clientSpec && attempt.clientSpec !== 'default' ? ['--extractor-args', `youtube:player_client=${attempt.clientSpec};player_skip=webpage,configs`] : []),
               '-f', targetFmt,
               '--', vUrl
             ];
