@@ -8256,6 +8256,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.isMuted = extMuted;
         if (!extMuted) state.volume = Math.sqrt(extVol);
         if (el.volumeSlider) el.volumeSlider.value = String(state.volume);
+        if (typeof updateVolumeProgressFill === 'function') updateVolumeProgressFill();
         if (el.volumeIcon) el.volumeIcon.classList.toggle('hidden', state.isMuted);
         if (el.volumeMutedIcon) el.volumeMutedIcon.classList.toggle('hidden', !state.isMuted);
         persistVolumeState();
@@ -14511,8 +14512,24 @@ function bindCoverHoldZoom(wrapEl) {
     } catch (e) {}
   }
 
+  function updateVolumeProgressFill() {
+    if (!el.volumeSlider) return;
+    const vol = state.isMuted ? 0 : (Number.isFinite(state.volume) ? state.volume : 0);
+    const pct = Math.max(0, Math.min(100, Math.round(vol * 100)));
+    el.volumeSlider.style.setProperty('--volume-percent', `${pct}%`);
+    const volWrapper = el.volumeSlider.closest('.volume-slider-wrapper');
+    if (volWrapper) {
+      volWrapper.style.setProperty('--volume-percent', `${pct}%`);
+    }
+    const tooltip = document.getElementById('volume-tooltip') || (volWrapper && volWrapper.querySelector('.volume-tooltip'));
+    if (tooltip) {
+      tooltip.textContent = `${pct}%`;
+    }
+  }
+
   if (el.volumeSlider) {
     el.volumeSlider.value = String(state.volume);
+    updateVolumeProgressFill();
     if (state.isMuted) {
       if (el.volumeIcon) el.volumeIcon.classList.add('hidden');
       if (el.volumeMutedIcon) el.volumeMutedIcon.classList.remove('hidden');
@@ -14525,11 +14542,13 @@ function bindCoverHoldZoom(wrapEl) {
       state.volume = Math.max(0, Math.min(1, Math.round((state.volume + step) * 100) / 100));
       if (state.volume > 0 && state.isMuted) state.isMuted = false;
       el.volumeSlider.value = String(state.volume);
+      updateVolumeProgressFill();
       el.volumeSlider.dispatchEvent(new Event('input'));
     }, { passive: false });
     el.volumeSlider.addEventListener('input', (e) => {
       state.volume = parseFloat(e.target.value);
       state.isMuted = false;
+      updateVolumeProgressFill();
       if (el.volumeIcon) el.volumeIcon.classList.remove('hidden');
       if (el.volumeMutedIcon) el.volumeMutedIcon.classList.add('hidden');
       persistVolumeState();
@@ -14540,6 +14559,7 @@ function bindCoverHoldZoom(wrapEl) {
   if (el.btnVolumeMute) {
     el.btnVolumeMute.addEventListener('click', () => {
       state.isMuted = !state.isMuted;
+      updateVolumeProgressFill();
       if (state.isMuted) {
         if (el.volumeIcon) el.volumeIcon.classList.add('hidden');
         if (el.volumeMutedIcon) el.volumeMutedIcon.classList.remove('hidden');
@@ -19214,6 +19234,7 @@ function bindCoverHoldZoom(wrapEl) {
     state.volume = Math.max(0, Math.min(1, Math.round((state.volume + delta) * 100) / 100));
     state.isMuted = false;
     if (el.volumeSlider) el.volumeSlider.value = state.volume;
+    if (typeof updateVolumeProgressFill === 'function') updateVolumeProgressFill();
     if (el.volumeIcon) el.volumeIcon.classList.remove('hidden');
     if (el.volumeMutedIcon) el.volumeMutedIcon.classList.add('hidden');
     persistVolumeState();
