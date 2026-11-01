@@ -38,7 +38,7 @@ function listenPort() {
   const a = server.address();
   return a && typeof a === 'object' && a.port ? a.port : PORT;
 }
-const { DATA_DIR, CACHE_DIR, CUSTOM_LYRICS_DIR, LYRICS_DIR, THUMBNAILS_DIR, METADATA_PATH, LIBRARY_DIR, LIBRARY_PATH, ytDlpCommand, resolveDownloadDir, defaultDownloadDir, resolveBinary, clearBinaryCache, cookieJarHasYtLogin, jsRuntime } = require('../shared/platform');
+const { DATA_DIR, CACHE_DIR, CUSTOM_LYRICS_DIR, LYRICS_DIR, THUMBNAILS_DIR, METADATA_PATH, LIBRARY_DIR, LIBRARY_PATH, ytDlpCommand, resolveDownloadDir, defaultDownloadDir, resolveBinary, clearBinaryCache, cookieJarHasYtLogin, jsRuntime, readConfig } = require('../shared/platform');
 const YT_COOKIES_FILE = path.join(DATA_DIR, 'yt-cookies.txt');
 const activeTempCookieJars = new Set();
 function cleanupStaleCookieJars() {
@@ -294,16 +294,54 @@ try {
   trackMetadataIndex = {};
 }
 
-function saveTrackMetadata(cleanId, meta) {
-  if (!cleanId) return;
-  trackMetadataIndex[cleanId] = {
-    ...(trackMetadataIndex[cleanId] || {}),
-    ...meta,
-    lastPlayed: Date.now()
-  };
+let metadataSaveTimer = null;
+let librarySaveTimer = null;
+
+async function writeAtomicJsonAsync(targetPath, data) {
+  const tmpPath = `${targetPath}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+  const content = JSON.stringify(data, null, 2);
   try {
-    fs.writeFileSync(METADATA_PATH, JSON.stringify(trackMetadataIndex, null, 2), 'utf-8');
-  } catch (e) {}
+    await fs.promises.writeFile(tmpPath, content, 'utf-8');
+    await fs.promises.rename(tmpPath, targetPath);
+  } catch (err) {
+    try { await fs.promises.unlink(tmpPath); } catch (_) {}
+    throw err;
+  }
+}
+
+function flushSyncPendingWrites() {
+  if (metadataSaveTimer) {
+    clearTimeout(metadataSaveTimer);
+    metadataSaveTimer = null;
+    try {
+      fs.writeFileSync(METADATA_PATH, JSON.stringify(trackMetadataIndex, null, 2), 'utf-8');
+    } catch (_) {}
+  }
+  if (librarySaveTimer) {
+    clearTimeout(librarySaveTimer);
+    librarySaveTimer = null;
+    try {
+      fs.writeFileSync(LIBRARY_PATH, JSON.stringify(libraryIndex, null, 2), 'utf-8');
+    } catch (_) {}
+  }
+}
+process.on('exit', flushSyncPendingWrites);
+
+function saveTrackMetadata(cleanId, meta) {
+  if (cleanId) {
+    trackMetadataIndex[cleanId] = {
+      ...(trackMetadataIndex[cleanId] || {}),
+      ...meta,
+      lastPlayed: Date.now()
+    };
+  }
+  if (metadataSaveTimer) clearTimeout(metadataSaveTimer);
+  metadataSaveTimer = setTimeout(() => {
+    metadataSaveTimer = null;
+    writeAtomicJsonAsync(METADATA_PATH, trackMetadataIndex).catch(err => {
+      console.warn('Failed to save track metadata index:', err);
+    });
+  }, 250);
 }
 
 let libraryIndex = {};
@@ -316,9 +354,13 @@ try {
 }
 
 function saveLibraryIndex() {
-  try {
-    fs.writeFileSync(LIBRARY_PATH, JSON.stringify(libraryIndex, null, 2), 'utf-8');
-  } catch (e) {}
+  if (librarySaveTimer) clearTimeout(librarySaveTimer);
+  librarySaveTimer = setTimeout(() => {
+    librarySaveTimer = null;
+    writeAtomicJsonAsync(LIBRARY_PATH, libraryIndex).catch(err => {
+      console.warn('Failed to save library index:', err);
+    });
+  }, 250);
 }
 
 const searchCache = new Map();
@@ -430,28 +472,84 @@ async function findCachedFile(trackId) {
   return null;
 }
 
-async function pruneDiskCache() {
+const DEFAULT_MAX_CACHE_BYTES = 3 * 1024 * 1024 * 1024; // 3 GB
+
+function getMaxCacheLimit() {
   try {
+    const cfg = typeof readConfig === 'function' ? readConfig() : {};
+    if (typeof cfg.maxCacheBytes === 'number' && cfg.maxCacheBytes > 0) return cfg.maxCacheBytes;
+    if (typeof cfg.maxCacheSizeGb === 'number' && cfg.maxCacheSizeGb > 0) return cfg.maxCacheSizeGb * 1024 * 1024 * 1024;
+    if (typeof cfg.maxCacheSizeMb === 'number' && cfg.maxCacheSizeMb > 0) return cfg.maxCacheSizeMb * 1024 * 1024;
+  } catch (_) {}
+  if (process.env.RASER_CACHE_LIMIT_BYTES) {
+    const envVal = parseInt(process.env.RASER_CACHE_LIMIT_BYTES, 10);
+    if (!isNaN(envVal) && envVal > 0) return envVal;
+  }
+  return DEFAULT_MAX_CACHE_BYTES;
+}
+
+async function pruneDiskCache(customMaxBytes) {
+  try {
+    const maxBytes = typeof customMaxBytes === 'number' && customMaxBytes > 0
+      ? customMaxBytes
+      : getMaxCacheLimit();
+
     const files = await fs.promises.readdir(CACHE_DIR);
     const now = Date.now();
+    const audioCandidates = [];
+    let totalBytes = 0;
+
     for (const file of files) {
       const fullPath = path.join(CACHE_DIR, file);
       try {
         const stat = await fs.promises.stat(fullPath);
         if (file.includes('.temp.')) {
           if (now - stat.mtimeMs > 10 * 60 * 1000) {
-            await fs.promises.unlink(fullPath);
+            await fs.promises.unlink(fullPath).catch(() => {});
           }
           continue;
         }
         if (stat.size < 1000) {
-          await fs.promises.unlink(fullPath);
+          await fs.promises.unlink(fullPath).catch(() => {});
           continue;
+        }
+        const ext = path.extname(file).toLowerCase();
+        if (['.m4a', '.webm', '.mp3', '.opus', '.ogg', '.flac'].includes(ext) || !file.includes('.')) {
+          totalBytes += stat.size;
+          const baseName = path.basename(file, ext);
+          const metaLastPlayed = trackMetadataIndex[baseName]?.lastPlayed || 0;
+          const accessTime = Math.max(stat.atimeMs || 0, stat.mtimeMs || 0, metaLastPlayed);
+          audioCandidates.push({
+            file,
+            fullPath,
+            size: stat.size,
+            accessTime,
+            baseName
+          });
         }
       } catch (e) {}
     }
+
+    if (totalBytes > maxBytes) {
+      const targetBytes = Math.floor(maxBytes * 0.8);
+      audioCandidates.sort((a, b) => a.accessTime - b.accessTime);
+
+      for (const item of audioCandidates) {
+        if (totalBytes <= targetBytes) break;
+        try {
+          await fs.promises.unlink(item.fullPath);
+          totalBytes -= item.size;
+          if (trackMetadataIndex[item.baseName]) {
+            delete trackMetadataIndex[item.baseName];
+            saveTrackMetadata();
+          }
+        } catch (_) {}
+      }
+    }
+    return { totalBytes, maxBytes, candidateCount: audioCandidates.length };
   } catch (e) {
     console.warn('Prune cache error:', e);
+    return null;
   }
 }
 
@@ -8918,7 +9016,7 @@ function stopServer() {
   });
 }
 
-module.exports = { startServer, stopServer, PORT, getServerToken, fetchLyricsDirect, fetchLrcLib, fetchGeniusLyrics, fetchNetEaseWords, fetchKugouLyrics, fetchMusixmatchLyrics, fetchNeteaseLyrics, fetchSoundCloudSearch, ytmusicSearch, parseYrc, cleanSearchResults, scoreImportedCandidate, findDownloadedFileName, decodeUtf8Chunks, hasBrokenLyricText };
+module.exports = { startServer, stopServer, PORT, getServerToken, fetchLyricsDirect, fetchLrcLib, fetchGeniusLyrics, fetchNetEaseWords, fetchKugouLyrics, fetchMusixmatchLyrics, fetchNeteaseLyrics, fetchSoundCloudSearch, ytmusicSearch, parseYrc, cleanSearchResults, scoreImportedCandidate, findDownloadedFileName, decodeUtf8Chunks, hasBrokenLyricText, pruneDiskCache, getMaxCacheLimit, writeAtomicJsonAsync, saveTrackMetadata, saveLibraryIndex, flushSyncPendingWrites };
 
 if (require.main === module) {
   startServer();
