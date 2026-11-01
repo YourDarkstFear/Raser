@@ -26,12 +26,10 @@
 </p>
 
 <p align="center">
-  <a href="#core-features">Features</a> &nbsp;·&nbsp;
-  <a href="#built-in-audio-suite">Audio Suite</a> &nbsp;·&nbsp;
-  <a href="#material-design-3-expressive-ui">Interface</a> &nbsp;·&nbsp;
+  <a href="#features">Features</a> &nbsp;·&nbsp;
   <a href="#download-and-install">Install</a> &nbsp;·&nbsp;
-  <a href="#faq">FAQ</a> &nbsp;·&nbsp;
-  <a href="#build-from-source">Build</a>
+  <a href="#build-from-source">Build</a> &nbsp;·&nbsp;
+  <a href="#contributing">Contributing</a>
 </p>
 
 <p align="center">
@@ -42,7 +40,10 @@
 
 ## What is Raser?
 
-Raser is an open-source, telemetry-free desktop music app and player for **Windows, Linux, and macOS**. It unifies playback across **YouTube Music**, **YouTube**, **SoundCloud**, and offline local media into a single high-performance interface without ads, subscriptions, or login constraints. Provides very fancy UI and layout.
+Raser is an open-source, telemetry-free desktop music player and audio suite for **Windows, Linux, and macOS**. It unifies playback across **YouTube Music**, **YouTube**, **SoundCloud**, and offline local media into a single high-performance interface without ads, subscriptions, or login constraints.
+
+> **Note on Project Origins:**  
+> This project was created because the original Riff project no longer accepts pull requests or external contributions. Raser continues development as an independent project, incorporating essential bug fixes, stability improvements, audio enhancements, and custom features.
 
 Built with **Electron**, **Vanilla JavaScript**, and **WebGL**, Raser provides responsive UI interactions and hardware-accelerated audio visualization without runtime framework overhead. The project is distributed under the **MIT license** and enforces strict privacy: all configuration, cached streams, and playback history remain strictly on the local machine.
 
@@ -84,10 +85,6 @@ npm start
 ## Contributing
 
 Pull requests and community contributions are very welcome! Feel free to report issues, suggest features, or submit pull requests.
-
-## Acknowledgements
-
-Raser is an independent continuation based on the open-source [Riff](https://github.com/rootscripts/riff) project by rootscripts, distributed under the MIT License.
 
 ## License
 

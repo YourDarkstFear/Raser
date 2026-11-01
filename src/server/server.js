@@ -7,7 +7,22 @@ const keepAliveHttpsAgent = new https.Agent({
   maxFreeSockets: 10,
   family: 4
 });
-const url = require('url');
+function parseRequestUrl(rawUrl) {
+  if (!rawUrl) return { pathname: '', search: '', query: {}, searchParams: new URLSearchParams(), href: '' };
+  try {
+    const urlObj = new URL(rawUrl, 'http://127.0.0.1');
+    const query = Object.fromEntries(urlObj.searchParams.entries());
+    return {
+      pathname: urlObj.pathname,
+      search: urlObj.search,
+      searchParams: urlObj.searchParams,
+      query,
+      href: urlObj.href
+    };
+  } catch (_) {
+    return { pathname: '', search: '', query: {}, searchParams: new URLSearchParams(), href: '' };
+  }
+}
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -23,8 +38,26 @@ function listenPort() {
   const a = server.address();
   return a && typeof a === 'object' && a.port ? a.port : PORT;
 }
-const { DATA_DIR, CACHE_DIR, CUSTOM_LYRICS_DIR, LYRICS_DIR, THUMBNAILS_DIR, METADATA_PATH, LIBRARY_DIR, LIBRARY_PATH, ytDlpCommand, resolveDownloadDir, defaultDownloadDir, resolveBinary, clearBinaryCache, cookieJarHasYtLogin, jsRuntime } = require('../shared/platform');
+const { DATA_DIR, CACHE_DIR, CUSTOM_LYRICS_DIR, LYRICS_DIR, THUMBNAILS_DIR, METADATA_PATH, LIBRARY_DIR, LIBRARY_PATH, ytDlpCommand, resolveDownloadDir, defaultDownloadDir, resolveBinary, clearBinaryCache, cookieJarHasYtLogin, jsRuntime, readConfig } = require('../shared/platform');
 const YT_COOKIES_FILE = path.join(DATA_DIR, 'yt-cookies.txt');
+const activeTempCookieJars = new Set();
+function cleanupStaleCookieJars() {
+  for (const p of activeTempCookieJars) {
+    try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch (_) {}
+  }
+  activeTempCookieJars.clear();
+  try {
+    if (fs.existsSync(DATA_DIR)) {
+      const files = fs.readdirSync(DATA_DIR);
+      for (const f of files) {
+        if (f.startsWith('.yt-cookies-') && f.endsWith('.tmp')) {
+          try { fs.unlinkSync(path.join(DATA_DIR, f)); } catch (_) {}
+        }
+      }
+    }
+  } catch (_) {}
+}
+process.once('exit', cleanupStaleCookieJars);
 
 // A browser cookie export can contain .google.com session cookies without the
 // user actually being signed in to YouTube. Passing those to yt-dlp makes the
@@ -261,16 +294,54 @@ try {
   trackMetadataIndex = {};
 }
 
-function saveTrackMetadata(cleanId, meta) {
-  if (!cleanId) return;
-  trackMetadataIndex[cleanId] = {
-    ...(trackMetadataIndex[cleanId] || {}),
-    ...meta,
-    lastPlayed: Date.now()
-  };
+let metadataSaveTimer = null;
+let librarySaveTimer = null;
+
+async function writeAtomicJsonAsync(targetPath, data) {
+  const tmpPath = `${targetPath}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+  const content = JSON.stringify(data, null, 2);
   try {
-    fs.writeFileSync(METADATA_PATH, JSON.stringify(trackMetadataIndex, null, 2), 'utf-8');
-  } catch (e) {}
+    await fs.promises.writeFile(tmpPath, content, 'utf-8');
+    await fs.promises.rename(tmpPath, targetPath);
+  } catch (err) {
+    try { await fs.promises.unlink(tmpPath); } catch (_) {}
+    throw err;
+  }
+}
+
+function flushSyncPendingWrites() {
+  if (metadataSaveTimer) {
+    clearTimeout(metadataSaveTimer);
+    metadataSaveTimer = null;
+    try {
+      fs.writeFileSync(METADATA_PATH, JSON.stringify(trackMetadataIndex, null, 2), 'utf-8');
+    } catch (_) {}
+  }
+  if (librarySaveTimer) {
+    clearTimeout(librarySaveTimer);
+    librarySaveTimer = null;
+    try {
+      fs.writeFileSync(LIBRARY_PATH, JSON.stringify(libraryIndex, null, 2), 'utf-8');
+    } catch (_) {}
+  }
+}
+process.on('exit', flushSyncPendingWrites);
+
+function saveTrackMetadata(cleanId, meta) {
+  if (cleanId) {
+    trackMetadataIndex[cleanId] = {
+      ...(trackMetadataIndex[cleanId] || {}),
+      ...meta,
+      lastPlayed: Date.now()
+    };
+  }
+  if (metadataSaveTimer) clearTimeout(metadataSaveTimer);
+  metadataSaveTimer = setTimeout(() => {
+    metadataSaveTimer = null;
+    writeAtomicJsonAsync(METADATA_PATH, trackMetadataIndex).catch(err => {
+      console.warn('Failed to save track metadata index:', err);
+    });
+  }, 250);
 }
 
 let libraryIndex = {};
@@ -283,9 +354,13 @@ try {
 }
 
 function saveLibraryIndex() {
-  try {
-    fs.writeFileSync(LIBRARY_PATH, JSON.stringify(libraryIndex, null, 2), 'utf-8');
-  } catch (e) {}
+  if (librarySaveTimer) clearTimeout(librarySaveTimer);
+  librarySaveTimer = setTimeout(() => {
+    librarySaveTimer = null;
+    writeAtomicJsonAsync(LIBRARY_PATH, libraryIndex).catch(err => {
+      console.warn('Failed to save library index:', err);
+    });
+  }, 250);
 }
 
 const searchCache = new Map();
@@ -397,28 +472,85 @@ async function findCachedFile(trackId) {
   return null;
 }
 
-async function pruneDiskCache() {
+const DEFAULT_MAX_CACHE_BYTES = 3 * 1024 * 1024 * 1024; // 3 GB
+
+function getMaxCacheLimit() {
   try {
-    const files = await fs.promises.readdir(CACHE_DIR);
+    const cfg = typeof readConfig === 'function' ? readConfig() : {};
+    if (typeof cfg.maxCacheBytes === 'number' && cfg.maxCacheBytes > 0) return cfg.maxCacheBytes;
+    if (typeof cfg.maxCacheSizeGb === 'number' && cfg.maxCacheSizeGb > 0) return cfg.maxCacheSizeGb * 1024 * 1024 * 1024;
+    if (typeof cfg.maxCacheSizeMb === 'number' && cfg.maxCacheSizeMb > 0) return cfg.maxCacheSizeMb * 1024 * 1024;
+  } catch (_) {}
+  if (process.env.RASER_CACHE_LIMIT_BYTES) {
+    const envVal = parseInt(process.env.RASER_CACHE_LIMIT_BYTES, 10);
+    if (!isNaN(envVal) && envVal > 0) return envVal;
+  }
+  return DEFAULT_MAX_CACHE_BYTES;
+}
+
+async function pruneDiskCache(customMaxBytes, customDir) {
+  try {
+    const dir = customDir || require('../shared/platform').CACHE_DIR || CACHE_DIR;
+    const maxBytes = typeof customMaxBytes === 'number' && customMaxBytes > 0
+      ? customMaxBytes
+      : getMaxCacheLimit();
+
+    const files = await fs.promises.readdir(dir);
     const now = Date.now();
+    const audioCandidates = [];
+    let totalBytes = 0;
+
     for (const file of files) {
-      const fullPath = path.join(CACHE_DIR, file);
+      const fullPath = path.join(dir, file);
       try {
         const stat = await fs.promises.stat(fullPath);
         if (file.includes('.temp.')) {
           if (now - stat.mtimeMs > 10 * 60 * 1000) {
-            await fs.promises.unlink(fullPath);
+            await fs.promises.unlink(fullPath).catch(() => {});
           }
           continue;
         }
         if (stat.size < 1000) {
-          await fs.promises.unlink(fullPath);
+          await fs.promises.unlink(fullPath).catch(() => {});
           continue;
+        }
+        const ext = path.extname(file).toLowerCase();
+        if (['.m4a', '.webm', '.mp3', '.opus', '.ogg', '.flac'].includes(ext) || !file.includes('.')) {
+          totalBytes += stat.size;
+          const baseName = path.basename(file, ext);
+          const metaLastPlayed = trackMetadataIndex[baseName]?.lastPlayed || 0;
+          const accessTime = Math.max(stat.atimeMs || 0, stat.mtimeMs || 0, metaLastPlayed);
+          audioCandidates.push({
+            file,
+            fullPath,
+            size: stat.size,
+            accessTime,
+            baseName
+          });
         }
       } catch (e) {}
     }
+
+    if (totalBytes > maxBytes) {
+      const targetBytes = Math.floor(maxBytes * 0.8);
+      audioCandidates.sort((a, b) => a.accessTime - b.accessTime);
+
+      for (const item of audioCandidates) {
+        if (totalBytes <= targetBytes) break;
+        try {
+          await fs.promises.unlink(item.fullPath);
+          totalBytes -= item.size;
+          if (trackMetadataIndex[item.baseName]) {
+            delete trackMetadataIndex[item.baseName];
+            saveTrackMetadata();
+          }
+        } catch (_) {}
+      }
+    }
+    return { totalBytes, maxBytes, candidateCount: audioCandidates.length };
   } catch (e) {
     console.warn('Prune cache error:', e);
+    return null;
   }
 }
 
@@ -711,6 +843,22 @@ async function fetchDirectYoutubeStreamServer(videoId, quality = 'medium') {
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       extraHeaders: authHeaders
     });
+  } else {
+    clients.push({
+      clientName: 'WEB_REMIX',
+      clientVersion: '1.20250922.01.00',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+    });
+    clients.push({
+      clientName: 'ANDROID',
+      clientVersion: '19.44.38',
+      androidSdkVersion: 34,
+      osName: 'Android',
+      osVersion: '14',
+      deviceMake: 'Google',
+      deviceModel: 'Pixel 8 Pro',
+      userAgent: 'com.google.android.youtube/19.44.38 (Linux; U; Android 14; en_US; sdk_gphone64_x86_64 Build/UE1A.230829.036) gzip'
+    });
   }
   if (clients.length === 0) return null;
 
@@ -801,6 +949,28 @@ async function fetchDirectYoutubeStreamServer(videoId, quality = 'medium') {
   try {
     return await Promise.any(clients.map(queryClient));
   } catch (_) {
+    if (authHeaders) {
+      try {
+        const anonClients = [
+          {
+            clientName: 'WEB_REMIX',
+            clientVersion: '1.20250922.01.00',
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+          },
+          {
+            clientName: 'ANDROID',
+            clientVersion: '19.44.38',
+            androidSdkVersion: 34,
+            osName: 'Android',
+            osVersion: '14',
+            deviceMake: 'Google',
+            deviceModel: 'Pixel 8 Pro',
+            userAgent: 'com.google.android.youtube/19.44.38 (Linux; U; Android 14; en_US; sdk_gphone64_x86_64 Build/UE1A.230829.036) gzip'
+          }
+        ];
+        return await Promise.any(anonClients.map(queryClient));
+      } catch (_) {}
+    }
     return null;
   }
 }
@@ -1688,8 +1858,27 @@ function executeYtDlp(args, timeoutMs = 15000, opts = {}) {
       if (!cookieJarPath) return;
       const p = cookieJarPath;
       cookieJarPath = null;
-      try { fs.unlinkSync(p); } catch (_) {}
+      activeTempCookieJars.delete(p);
+      try {
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      } catch (_) {}
     };
+
+    let settled = false;
+    let timer = null;
+    const safeResolve = (val) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      try { cleanupCookieJar(); } finally { resolve(val); }
+    };
+    const safeReject = (err) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      try { cleanupCookieJar(); } finally { reject(err); }
+    };
+
     if (!finalArgs.includes('--force-ipv4')) prependFlags.push('--force-ipv4');
     if (!finalArgs.includes('--geo-bypass')) prependFlags.push('--geo-bypass');
     const runtime = jsRuntime();
@@ -1705,6 +1894,7 @@ function executeYtDlp(args, timeoutMs = 15000, opts = {}) {
       try {
         cookieJarPath = path.join(DATA_DIR, `.yt-cookies-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.tmp`);
         fs.copyFileSync(YT_COOKIES_FILE, cookieJarPath);
+        activeTempCookieJars.add(cookieJarPath);
         prependFlags.push('--cookies', cookieJarPath);
       } catch (_) {
         cleanupCookieJar();
@@ -1728,63 +1918,63 @@ function executeYtDlp(args, timeoutMs = 15000, opts = {}) {
         finalArgs.unshift('--proxy', '');
       }
     }
-    const cmd = ytDlpCommand(finalArgs);
-    const YTDLP_PATH = cmd.bin;
-    const proc = spawn(YTDLP_PATH, cmd.args, { windowsHide: true, env: cleanEnv });
-    if (opts && typeof opts.onChild === 'function') {
-      try { opts.onChild(proc); } catch (_) {}
-    }
-    let stdout = '';
-    let stderr = '';
-    const outDecoder = new StringDecoder('utf8');
-    const errDecoder = new StringDecoder('utf8');
-    let timer = null;
 
-    if (timeoutMs > 0) {
-      timer = setTimeout(() => {
-        try { proc.kill('SIGKILL'); } catch (e) {}
-        cleanupCookieJar();
-        reject(new Error(`yt-dlp timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-    }
+    try {
+      const cmd = ytDlpCommand(finalArgs);
+      const YTDLP_PATH = cmd.bin;
+      const proc = spawn(YTDLP_PATH, cmd.args, { windowsHide: true, env: cleanEnv });
+      if (opts && typeof opts.onChild === 'function') {
+        try { opts.onChild(proc); } catch (_) {}
+      }
+      let stdout = '';
+      let stderr = '';
+      const outDecoder = new StringDecoder('utf8');
+      const errDecoder = new StringDecoder('utf8');
 
-    proc.stdout.on('data', (d) => { stdout += outDecoder.write(d); });
-    proc.stderr.on('data', (d) => { stderr += errDecoder.write(d); });
+      if (timeoutMs > 0) {
+        timer = setTimeout(() => {
+          try { proc.kill('SIGKILL'); } catch (e) {}
+          safeReject(new Error(`yt-dlp timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }
 
-    proc.on('close', (code) => {
-      if (timer) clearTimeout(timer);
-      cleanupCookieJar();
-      if (code === 0) {
-        resolve(stdout);
-      } else {
-        const firstArgs = (args || []).slice(0, 3).join(' ');
-        const errSnippet = String(stderr || `code ${code}`).slice(0, 300);
-        const isWarn = !stderr || /not available|unavailable|private video|timed out/i.test(errSnippet);
-        if (!opts.quiet) {
-          try { logger.log(isWarn ? 'warn' : 'error', `yt-dlp failed: ${firstArgs} - ${errSnippet}`); } catch (_) {}
+      proc.stdout.on('data', (d) => { stdout += outDecoder.write(d); });
+      proc.stderr.on('data', (d) => { stderr += errDecoder.write(d); });
+
+      proc.on('close', (code) => {
+        if (code === 0) {
+          safeResolve(stdout);
+        } else {
+          const firstArgs = (args || []).slice(0, 3).join(' ');
+          const errSnippet = String(stderr || `code ${code}`).slice(0, 300);
+          const isWarn = !stderr || /not available|unavailable|private video|timed out/i.test(errSnippet);
+          if (!opts.quiet) {
+            try { logger.log(isWarn ? 'warn' : 'error', `yt-dlp failed: ${firstArgs} - ${errSnippet}`); } catch (_) {}
+          }
+          safeReject(new Error(stderr || `yt-dlp exited with code ${code}`));
         }
-        reject(new Error(stderr || `yt-dlp exited with code ${code}`));
-      }
-    });
+      });
 
-    proc.on('error', (err) => {
-      if (timer) clearTimeout(timer);
-      cleanupCookieJar();
-      const firstArgs = (args || []).slice(0, 3).join(' ');
-      const errSnippet = String(err && err.message ? err.message : err).slice(0, 300);
-      try { logger.log('error', `yt-dlp spawn error: ${firstArgs} - ${errSnippet}`); } catch (_) {}
-      // A managed yt-dlp can disappear between resolution and spawn (failed
-      // self-update, cleared data dir). Drop the stale cache entry and retry
-      // once so we can fall back to a binary from PATH.
-      if (err && err.code === 'ENOENT' && !opts.retried) {
-        clearBinaryCache();
-        try {
-          resolveBinary('yt-dlp');
-        } catch (_) {}
-        return executeYtDlp(args, timeoutMs, Object.assign({}, opts, { retried: true })).then(resolve, reject);
-      }
-      reject(err);
-    });
+      proc.on('error', (err) => {
+        const firstArgs = (args || []).slice(0, 3).join(' ');
+        const errSnippet = String(err && err.message ? err.message : err).slice(0, 300);
+        try { logger.log('error', `yt-dlp spawn error: ${firstArgs} - ${errSnippet}`); } catch (_) {}
+        // A managed yt-dlp can disappear between resolution and spawn (failed
+        // self-update, cleared data dir). Drop the stale cache entry and retry
+        // once so we can fall back to a binary from PATH.
+        if (err && err.code === 'ENOENT' && !opts.retried) {
+          cleanupCookieJar();
+          clearBinaryCache();
+          try {
+            resolveBinary('yt-dlp');
+          } catch (_) {}
+          return executeYtDlp(args, timeoutMs, Object.assign({}, opts, { retried: true })).then(safeResolve, safeReject);
+        }
+        safeReject(err);
+      });
+    } catch (spawnErr) {
+      safeReject(spawnErr);
+    }
   });
 }
 
@@ -2528,8 +2718,88 @@ async function handleTrending(req, res) {
   res.end(JSON.stringify({ success: true, tracks: tracks || [] }));
 }
 
+function transliterateCyrillic(str) {
+  const map = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
+    'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+    'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+    'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+    'і': 'i', 'ї': 'yi', 'є': 'ye', 'ґ': 'g', 'ў': 'u'
+  };
+  return String(str || '').replace(/[а-яёіїєґў]/gi, ch => {
+    const lower = ch.toLowerCase();
+    const mapped = map[lower];
+    if (mapped === undefined) return ch;
+    return ch === lower ? mapped : (mapped.length > 1 ? mapped[0].toUpperCase() + mapped.slice(1) : mapped.toUpperCase());
+  });
+}
+
+function transliterateGreek(str) {
+  const map = {
+    'α': 'a', 'β': 'b', 'γ': 'g', 'δ': 'd', 'ε': 'e', 'ζ': 'z', 'η': 'i',
+    'θ': 'th', 'ι': 'i', 'κ': 'k', 'λ': 'l', 'μ': 'm', 'ν': 'n', 'ξ': 'x',
+    'ο': 'o', 'π': 'p', 'ρ': 'r', 'σ': 's', 'ς': 's', 'τ': 't', 'υ': 'y',
+    'φ': 'f', 'χ': 'ch', 'ψ': 'ps', 'ω': 'o',
+    'ά': 'a', 'έ': 'e', 'ή': 'i', 'ί': 'i', 'ϊ': 'i', 'ΐ': 'i',
+    'ό': 'o', 'ύ': 'y', 'ϋ': 'y', 'ΰ': 'y', 'ώ': 'o'
+  };
+  let s = String(str || '');
+  s = s.replace(/ου/gi, 'ou')
+       .replace(/ού/gi, 'ou')
+       .replace(/μπ/gi, 'b')
+       .replace(/ντ/gi, 'nt')
+       .replace(/γκ/gi, 'gk');
+  return s.replace(/[α-ωά-ώΐΰϊϋ]/gi, ch => {
+    const lower = ch.toLowerCase();
+    const mapped = map[lower];
+    if (mapped === undefined) return ch;
+    return ch === lower ? mapped : (mapped.length > 1 ? mapped[0].toUpperCase() + mapped.slice(1) : mapped.toUpperCase());
+  });
+}
+
+function transliterateArabic(str) {
+  const map = {
+    '\u0621': '', '\u0622': 'a', '\u0623': 'a', '\u0624': 'w', '\u0625': 'i', '\u0626': 'y',
+    '\u0627': 'a', '\u0628': 'b', '\u0629': 'h', '\u062a': 't', '\u062b': 'th', '\u062c': 'j',
+    '\u062d': 'h', '\u062e': 'kh', '\u062f': 'd', '\u0630': 'dh', '\u0631': 'r', '\u0632': 'z',
+    '\u0633': 's', '\u0634': 'sh', '\u0635': 's', '\u0636': 'd', '\u0637': 't', '\u0638': 'z',
+    '\u0639': 'a', '\u063a': 'gh', '\u0641': 'f', '\u0642': 'q', '\u0643': 'k', '\u0644': 'l',
+    '\u0645': 'm', '\u0646': 'n', '\u0647': 'h', '\u0648': 'w', '\u0649': 'a', '\u064a': 'y',
+    '\u0671': 'a', '\u06a9': 'k', '\u06af': 'g', '\u067e': 'p', '\u0686': 'ch', '\u0698': 'zh',
+    '\u06cc': 'y'
+  };
+  return String(str || '').replace(/[\u0621-\u064a\u0671\u067e\u0686\u0698\u06a9\u06af\u06cc]/g, ch => map[ch] !== undefined ? map[ch] : ch);
+}
+
+function transliterateText(s) {
+  if (!s) return '';
+  let str = String(s).normalize('NFKC');
+  str = transliterateCyrillic(str);
+  str = transliterateGreek(str);
+  str = str
+    .replace(/æ/gi, 'ae')
+    .replace(/œ/gi, 'oe')
+    .replace(/ø/gi, 'o')
+    .replace(/ß/g, 'ss')
+    .replace(/ð/gi, 'd')
+    .replace(/þ/gi, 'th')
+    .replace(/ł/gi, 'l')
+    .replace(/đ/gi, 'd');
+  str = str.normalize('NFKD')
+    .replace(/[\u0300-\u036f\u0591-\u05c7\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/g, '')
+    .replace(/\u0640/g, '')
+    .replace(/[\u06cc\u0649]/g, '\u064a')
+    .replace(/\u06a9/g, '\u0643')
+    .replace(/[\u0629\u06c1]/g, '\u0647')
+    .replace(/[\u0622\u0623\u0625\u0671]/g, '\u0627');
+  str = transliterateArabic(str);
+  return str;
+}
+
 function normText(s) {
-  return String(s || '').toLowerCase()
+  return transliterateText(String(s || ''))
+    .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -2553,6 +2823,22 @@ function extractArtists(str) {
     .filter(a => a.length > 0 && a !== 'unknown artist');
 }
 
+function artistsMatch(targetArt, candArt) {
+  if (!targetArt || !candArt) return false;
+  const tNorm = normText(targetArt);
+  const cNorm = normText(candArt);
+  if (tNorm && cNorm) {
+    if (tNorm === cNorm || cNorm.includes(tNorm) || tNorm.includes(cNorm)) return true;
+    const tV = tNorm.replace(/y/g, 'i');
+    const cV = cNorm.replace(/y/g, 'i');
+    if (tV === cV || cV.includes(tV) || tV.includes(cV)) return true;
+  }
+  const tRaw = String(targetArt).toLowerCase().trim();
+  const cRaw = String(candArt).toLowerCase().trim();
+  if (tRaw && cRaw && (tRaw === cRaw || cRaw.includes(tRaw) || tRaw.includes(cRaw))) return true;
+  return false;
+}
+
 function scoreImportedCandidate(targetTitle, targetArtist, targetDur, cand) {
   if (!cand || !cand.title) return -999;
 
@@ -2572,9 +2858,11 @@ function scoreImportedCandidate(targetTitle, targetArtist, targetDur, cand) {
 
   // 1. ŞARKI İSMİ KONTROLÜ (Deep Title Match)
   if (tTitleClean && cTitleClean) {
-    if (tTitleClean === cTitleClean) {
+    const tY = tTitleClean.replace(/y/g, 'i');
+    const cY = cTitleClean.replace(/y/g, 'i');
+    if (tTitleClean === cTitleClean || tY === cY) {
       score += 65;
-    } else if (cTitleClean.includes(tTitleClean) || tTitleClean.includes(cTitleClean)) {
+    } else if (cTitleClean.includes(tTitleClean) || tTitleClean.includes(cTitleClean) || cY.includes(tY) || tY.includes(cY)) {
       score += 45;
     } else {
       const tWords = tTitleClean.split(' ').filter(w => w.length > 1);
@@ -2590,10 +2878,10 @@ function scoreImportedCandidate(targetTitle, targetArtist, targetDur, cand) {
   // 2. SANATÇI / ŞARKICI KONTROLÜ (Deep Artist Match)
   if (primaryTArtist) {
     let artistMatched = false;
-    if (cArtistNorm === primaryTArtist || cArtistNorm.includes(primaryTArtist) || primaryTArtist.includes(cArtistNorm)) {
+    if (cArtistNorm === primaryTArtist || cArtistNorm.includes(primaryTArtist) || primaryTArtist.includes(cArtistNorm) || artistsMatch(primaryTArtist, cArtistNorm)) {
       score += 50;
       artistMatched = true;
-    } else if (cFullNorm.includes(primaryTArtist)) {
+    } else if (cFullNorm.includes(primaryTArtist) || artistsMatch(primaryTArtist, cFullNorm)) {
       score += 35;
       artistMatched = true;
     }
@@ -2601,7 +2889,7 @@ function scoreImportedCandidate(targetTitle, targetArtist, targetDur, cand) {
     if (tArtists.length > 1) {
       for (let i = 1; i < tArtists.length; i++) {
         const secArtist = tArtists[i];
-        if (secArtist && (cFullNorm.includes(secArtist) || cArtistNorm.includes(secArtist))) {
+        if (secArtist && (cFullNorm.includes(secArtist) || cArtistNorm.includes(secArtist) || artistsMatch(secArtist, cFullNorm) || artistsMatch(secArtist, cArtistNorm))) {
           score += 15;
           artistMatched = true;
         }
@@ -2702,7 +2990,7 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
   };
   artist = stripYoutubeTopic(artist);
   trackUrl = normalizeSoundCloudUrl(trackUrl);
-  const parsedUrl = (req && req.url) ? url.parse(req.url, true) : { query: {} };
+  const parsedUrl = (req && req.url) ? parseRequestUrl(req.url) : { pathname: '', search: '', query: {}, searchParams: new URLSearchParams(), href: '' };
   const forShare = Boolean(parsedUrl.query && parsedUrl.query.forShare === '1');
   const forceYtDlp = Boolean(parsedUrl.query && parsedUrl.query.forceYtDlp === '1');
   const quality = (parsedUrl.query && parsedUrl.query.quality) || 'medium';
@@ -2997,16 +3285,32 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
 
         const remaining = rankedCandidates.slice(1);
         if (remaining.length > 0) {
-          const streamResults = await Promise.all(remaining.map(async ({ cand }) => {
-            try {
-              const url = await resolveYtCandidateStream(cand.id);
-              return url ? { url, id: cand.id } : null;
-            } catch (_) {
-              return null;
+          let found = null;
+          let idx = 0;
+          const CONCURRENCY = 2;
+
+          const worker = async () => {
+            while (idx < remaining.length && !found) {
+              const current = remaining[idx++];
+              if (!current || !current.cand || found) break;
+              try {
+                const url = await resolveYtCandidateStream(current.cand.id);
+                if (url && !found) {
+                  found = { url, id: current.cand.id };
+                  break;
+                }
+              } catch (_) {}
             }
-          }));
-          const bestMatch = streamResults.find(result => result !== null);
-          if (bestMatch) return sendStreamResponse(bestMatch.url, bestMatch.id);
+          };
+
+          const workerCount = Math.min(CONCURRENCY, remaining.length);
+          const workers = [];
+          for (let w = 0; w < workerCount; w++) {
+            workers.push(worker());
+          }
+          await Promise.all(workers);
+
+          if (found) return sendStreamResponse(found.url, found.id);
         }
       }
 
@@ -4002,7 +4306,7 @@ async function handleDownload(req, res, trackUrl, title, artist, format = 'mp3',
   }
 
   const isRaw = Boolean(raw);
-  const parsedUrl = (req && req.url) ? url.parse(req.url, true) : { query: {} };
+  const parsedUrl = (req && req.url) ? parseRequestUrl(req.url) : { pathname: '', search: '', query: {}, searchParams: new URLSearchParams(), href: '' };
   const album = albumParam || (parsedUrl.query && parsedUrl.query.album) || '';
   let downloadsDir = getDownloadsDir();
   const customDir = parsedUrl.query && parsedUrl.query.customDir;
@@ -4992,7 +5296,7 @@ async function fetchKugouLyrics(title, artist, durationSec = 0) {
     if (!dlJson || !dlJson.content) return null;
 
     let lrcText = Buffer.from(dlJson.content, 'base64').toString('utf8');
-    lrcText = lrcText.replace(/^\[(id|ti|ar|al|by|hash|sign|qq|total|offset):[^\]]*\]\r?\n?/gim, '').trim();
+    lrcText = lrcText.replace(/^\[(id|ti|ar|al|by|hash|sign|qq|total):[^\]]*\]\r?\n?/gim, '').trim();
 
     if (lrcText) {
       return { syncedLyrics: lrcText, plainLyrics: '' };
@@ -5688,6 +5992,40 @@ function fetchSpotifyEmbed(playlistId, ua) {
   });
 }
 
+
+function extractJsonObject(str, keywords = ['pageProps', 'trackList', 'entity']) {
+  if (!keywords.some(k => str.includes(k))) return null;
+  let depth = 0;
+  let inStr = false;
+  let quote = '';
+  let escaped = false;
+  let jsonStart = -1;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (inStr) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === quote) inStr = false;
+    } else {
+      if (ch === '\"' || ch === "'") {
+        inStr = true;
+        quote = ch;
+        escaped = false;
+      } else if (ch === '{') {
+        if (depth === 0) jsonStart = i;
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0 && jsonStart !== -1) {
+          const candidate = str.slice(jsonStart, i + 1);
+          if (keywords.some(k => candidate.includes(k))) return candidate;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 async function handleSpotifyImport(req, res, inputUrl) {
   const m = (inputUrl || '').match(/^(?:(?:https:\/\/)?open\.spotify\.com\/(?:embed\/)?playlist\/|spotify:playlist:)([a-zA-Z0-9]{22})(?:[/?#]|$)/);
   if (!m) {
@@ -5734,21 +6072,80 @@ async function handleSpotifyImport(req, res, inputUrl) {
 
   try {
     const body = embedRes.body;
-    const nextDataMatch = body.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-    if (!nextDataMatch) {
+    let data = null;
+    let rawJson = '';
+
+    const scriptPatterns = [
+      /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i,
+      /<script id="initial-state"[^>]*>([\s\S]*?)<\/script>/i,
+      /<script id="session"[^>]*>([\s\S]*?)<\/script>/i,
+      /<script[^>]*type="application\/json"[^>]*>([\s\S]*?)<\/script>/gi
+    ];
+
+    for (const pat of scriptPatterns) {
+      if (pat.global) {
+        let m;
+        while ((m = pat.exec(body)) !== null) {
+          if (m[1] && (m[1].includes('props') || m[1].includes('trackList') || m[1].includes('spotify:track') || m[1].includes('entity'))) {
+            rawJson = m[1];
+            break;
+          }
+        }
+      } else {
+        const m = body.match(pat);
+        if (m && m[1]) {
+          rawJson = m[1];
+          break;
+        }
+      }
+      if (rawJson) break;
+    }
+
+    if (!rawJson) {
+      const scriptTagRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+      let sm;
+      while ((sm = scriptTagRegex.exec(body)) !== null) {
+        const content = sm[1];
+        if (content && (content.includes('pageProps') || content.includes('trackList') || content.includes('entity'))) {
+          const extracted = extractJsonObject(content, ['pageProps', 'trackList', 'entity']);
+          if (extracted) {
+            rawJson = extracted;
+            break;
+          }
+        }
+      }
+    }
+
+    if (rawJson) {
+      try {
+        data = JSON.parse(rawJson);
+      } catch (_) {
+        try {
+          const unescaped = rawJson
+            .replace(/&quot;/g, '"')
+            .replace(/&amp;/g, '&')
+            .replace(/&#39;/g, "'")
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&#x27;/g, "'");
+          data = JSON.parse(unescaped);
+        } catch (_) {}
+      }
+    }
+
+    if (!data) {
       const isPriv = /private/i.test(body);
       res.writeHead(403, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ success: false, code: isPriv ? 'spotify_forbidden' : 'spotify_error', error: isPriv ? 'Private playlist' : 'Could not parse playlist' }));
     }
 
-    const data = JSON.parse(nextDataMatch[1]);
-    const pageProps = data?.props?.pageProps;
+    const pageProps = data?.props?.pageProps || data?.pageProps || data;
     if (pageProps?.status === 404) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ success: false, code: 'spotify_not_found', error: 'Playlist not found' }));
     }
 
-    const entity = pageProps?.state?.data?.entity;
+    const entity = pageProps?.state?.data?.entity || pageProps?.entity || data?.entity;
     const name = entity?.name || pageProps?.title || 'Spotify Playlist';
     const ogMatch = body.match(/<meta\s+(?:property|name)=["'](?:og:image|twitter:image)["']\s+content=["']([^"']+)["']/i);
     let cover = (entity?.images && Array.isArray(entity.images) && entity.images[0]?.url) ||
@@ -5760,7 +6157,7 @@ async function handleSpotifyImport(req, res, inputUrl) {
 
     let tracks = [];
     let limited = false;
-    const accessToken = pageProps?.state?.settings?.session?.accessToken;
+    const accessToken = pageProps?.state?.settings?.session?.accessToken || data?.session?.accessToken || pageProps?.session?.accessToken;
     let total = 0;
     if (accessToken) {
       try {
@@ -5781,8 +6178,12 @@ async function handleSpotifyImport(req, res, inputUrl) {
     }
 
     if (!tracks.length) {
-      if (Array.isArray(entity?.trackList) && entity.trackList.length > 0) {
-        tracks = entity.trackList.slice(0, 100).map(t => {
+      const candidateTrackList = Array.isArray(entity?.trackList) && entity.trackList.length > 0 ? entity.trackList :
+                                 (Array.isArray(entity?.tracks?.items) ? entity.tracks.items.map(i => i.track || i) :
+                                 (Array.isArray(entity?.tracks) ? entity.tracks : []));
+
+      if (candidateTrackList.length > 0) {
+        tracks = candidateTrackList.slice(0, 100).map(t => {
           const duration = typeof t.duration === 'number' ? Math.round(t.duration / 1000) : (typeof t.duration_ms === 'number' ? Math.round(t.duration_ms / 1000) : 0);
           const trackCover = t.image || t.coverArt?.sources?.[0]?.url || '';
           const spotifyId = spotifyTrackId(t);
@@ -5791,7 +6192,7 @@ async function handleSpotifyImport(req, res, inputUrl) {
             spotifyId,
             spotifyUrl: spotifyId ? `https://open.spotify.com/track/${spotifyId}` : '',
             title: (t.title || t.name || '').trim(),
-            artist: (t.subtitle || t.artist || '').trim(),
+            artist: (t.subtitle || t.artist || (Array.isArray(t.artists) ? t.artists.map(a => typeof a === 'string' ? a : (a.name || a.profile?.name)).filter(Boolean).join(', ') : '')).trim(),
             duration,
             thumbnail: trackCover,
             cover: trackCover
@@ -5803,17 +6204,18 @@ async function handleSpotifyImport(req, res, inputUrl) {
         function walk(node) {
           if (!node || typeof node !== 'object') return;
           if (Array.isArray(node)) { for (const item of node) walk(item); return; }
-          const uri = typeof node.uri === 'string' ? node.uri : '';
-          const title = node.title || node.name;
-          const subtitle = node.subtitle || node.artist || (Array.isArray(node.artists) ? node.artists.map(a => typeof a === 'string' ? a : (a.name || a.profile?.name)).filter(Boolean).join(', ') : (node.albumOfTrack?.artists?.items || []).map(a => a.profile?.name).filter(Boolean).join(', '));
-          const duration = node.duration?.totalMilliseconds || node.trackDuration?.totalMilliseconds || node.duration_ms || (typeof node.duration === 'number' ? node.duration : 0);
-          if (title && typeof title === 'string' && (subtitle || uri.startsWith('spotify:track:')) && (uri.startsWith('spotify:track:') || node.entityType === 'track' || duration)) {
+          const target = (node.track || node.item || node);
+          const uri = typeof target.uri === 'string' ? target.uri : (typeof node.uri === 'string' ? node.uri : '');
+          const title = target.title || target.name || target.trackName || node.title || node.name;
+          const subtitle = target.subtitle || target.artist || (Array.isArray(target.artists) ? target.artists.map(a => typeof a === 'string' ? a : (a.name || a.profile?.name)).filter(Boolean).join(', ') : (target.artists?.items ? target.artists.items.map(a => a.profile?.name || a.name).filter(Boolean).join(', ') : (target.albumOfTrack?.artists?.items || []).map(a => a.profile?.name).filter(Boolean).join(', ')));
+          const duration = target.duration?.totalMilliseconds || target.trackDuration?.totalMilliseconds || target.duration_ms || target.durationMs || (typeof target.duration === 'number' ? target.duration : (node.duration?.totalMilliseconds || node.duration_ms || 0));
+          if (title && typeof title === 'string' && (subtitle || uri.startsWith('spotify:track:')) && (uri.startsWith('spotify:track:') || target.entityType === 'track' || duration)) {
             const key = `${title}__${subtitle || ''}`;
             if (!seen.has(key)) {
               seen.add(key);
               const durSec = typeof duration === 'number' ? (duration > 1000 ? Math.round(duration / 1000) : Math.round(duration)) : 0;
-              const trackCover = node.image || node.coverArt?.sources?.[0]?.url || '';
-              const spotifyId = spotifyTrackId(node);
+              const trackCover = target.image || target.coverArt?.sources?.[0]?.url || '';
+              const spotifyId = spotifyTrackId(target);
               tracks.push({
                 id: spotifyId,
                 spotifyId,
@@ -5844,7 +6246,17 @@ async function handleSpotifyImport(req, res, inputUrl) {
       return res.end(JSON.stringify({ success: false, code: isPriv ? 'spotify_forbidden' : 'spotify_error', error: isPriv ? 'Private playlist' : 'Could not read tracks' }));
     }
 
-    if (limited && (!Array.isArray(entity?.trackList) || !Number.isInteger(entity.totalCount) || entity.totalCount > entity.trackList.length || entity.trackList.length > 100)) {
+    const hasLegacyTrackList = Array.isArray(entity?.trackList);
+    const rawTrackCount = hasLegacyTrackList ? entity.trackList.length : tracks.length;
+    const expectedTotal = Number.isInteger(entity?.totalCount)
+      ? entity.totalCount
+      : (Number.isInteger(entity?.tracks?.total) ? entity.tracks.total : (Number.isInteger(total) ? total : rawTrackCount));
+
+    const isIncomplete = hasLegacyTrackList
+      ? (!Number.isInteger(entity.totalCount) || entity.totalCount > entity.trackList.length || entity.trackList.length > 100)
+      : (rawTrackCount === 0 || (Number.isInteger(expectedTotal) && expectedTotal > rawTrackCount) || rawTrackCount > 100);
+
+    if (limited && isIncomplete) {
       res.writeHead(409, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ success: false, code: 'spotify_incomplete', error: 'Spotify exposed only part of this playlist. Connect your account or use Export files.' }));
     }
@@ -7793,7 +8205,7 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
 
-  const parsedUrl = url.parse(req.url, true);
+  const parsedUrl = parseRequestUrl(req.url);
   const pathname = parsedUrl.pathname;
 
   if (pathname.startsWith('/api/lastfm/')) { handleLastFmRoute(req, res, pathname); return; }
@@ -8565,12 +8977,7 @@ function writePortFile(p) {
 function startServer(port = PORT) {
   try {
     require('./tools').cleanupStalePyinstallerDirs();
-    const files = fs.readdirSync(DATA_DIR);
-    for (const f of files) {
-      if (f.startsWith('.yt-cookies-') && f.endsWith('.tmp')) {
-        try { fs.unlinkSync(path.join(DATA_DIR, f)); } catch (_) {}
-      }
-    }
+    cleanupStaleCookieJars();
   } catch (_) {}
   if (server.listening) {
     const address = server.address();
@@ -8600,6 +9007,7 @@ function startServer(port = PORT) {
 }
 
 function stopServer() {
+  cleanupStaleCookieJars();
   if (!server.listening) return Promise.resolve();
   return new Promise((resolve, reject) => {
     server.close((error) => {
@@ -8609,7 +9017,7 @@ function stopServer() {
   });
 }
 
-module.exports = { startServer, stopServer, PORT, getServerToken, fetchLyricsDirect, fetchLrcLib, fetchGeniusLyrics, fetchNetEaseWords, fetchKugouLyrics, fetchMusixmatchLyrics, fetchNeteaseLyrics, fetchSoundCloudSearch, ytmusicSearch, parseYrc, cleanSearchResults, scoreImportedCandidate, findDownloadedFileName, decodeUtf8Chunks, hasBrokenLyricText };
+module.exports = { startServer, stopServer, PORT, getServerToken, fetchLyricsDirect, fetchLrcLib, fetchGeniusLyrics, fetchNetEaseWords, fetchKugouLyrics, fetchMusixmatchLyrics, fetchNeteaseLyrics, fetchSoundCloudSearch, ytmusicSearch, parseYrc, cleanSearchResults, scoreImportedCandidate, findDownloadedFileName, decodeUtf8Chunks, hasBrokenLyricText, pruneDiskCache, getMaxCacheLimit, writeAtomicJsonAsync, saveTrackMetadata, saveLibraryIndex, flushSyncPendingWrites };
 
 if (require.main === module) {
   startServer();

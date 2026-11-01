@@ -6,7 +6,8 @@ try {
   try { console.warn('[Discord RPC] discord-rpc is not installed, rich presence disabled'); } catch (_) {}
 }
 
-const CLIENT_ID = '1520100510877749358';
+const DEFAULT_CLIENT_ID = '1566492575345676440';
+const CLIENT_ID = process.env.DISCORD_CLIENT_ID || DEFAULT_CLIENT_ID;
 const RECONNECT_DELAY_MS = 15000;
 
 let rpcClient = null;
