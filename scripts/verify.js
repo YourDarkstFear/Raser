@@ -16,6 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const http = require('http');
 const vm = require('vm');
 const { spawn, spawnSync, execFileSync } = require('child_process');
@@ -73,6 +74,7 @@ class VerificationRunner {
     console.log(`${SYMBOLS.arrow} ${c.bold}${name}${c.reset}`);
     const suiteStart = Date.now();
     let suiteError = null;
+    const checksBefore = this.failedChecks;
 
     try {
       await suiteFn(this);
@@ -82,7 +84,8 @@ class VerificationRunner {
     }
 
     const suiteDuration = Date.now() - suiteStart;
-    if (suiteError) {
+    const suiteFailed = suiteError || (this.failedChecks > checksBefore);
+    if (suiteFailed) {
       this.suitesFailed++;
       console.log(`  ${c.red}Suite failed in ${suiteDuration}ms${c.reset}\n`);
     } else {
@@ -721,16 +724,22 @@ async function runCleanStartupSuite(runner) {
   );
 
   // 2. Full Electron main process startup lifecycle probe
-  const localElectron = path.join(ROOT_DIR, 'node_modules', '.bin', 'electron');
-  const electronBin = fs.existsSync(localElectron) ? localElectron : 'electron';
+  let electronBin;
+  try {
+    electronBin = require('electron');
+  } catch (_) {
+    const localBin = path.join(ROOT_DIR, 'node_modules', '.bin', 'electron');
+    electronBin = fs.existsSync(localBin) ? localBin : 'electron';
+  }
 
+  const tmpUserData = fs.mkdtempSync(path.join(os.tmpdir(), 'raser-verify-user-data-'));
   const startupStart = Date.now();
   let serverReadyDetected = false;
   let fatalErrorDetected = false;
   let loggedOutput = '';
 
   const startupPromise = new Promise((resolve, reject) => {
-    const child = spawn(electronBin, ['.', '--no-sandbox'], {
+    const child = spawn(electronBin, ['.', '--no-sandbox', `--user-data-dir=${tmpUserData}`], {
       cwd: ROOT_DIR,
       env: Object.assign({}, process.env, {
         RASER_SKIP_GPU_BUFFER_FLAGS: '1',
@@ -796,6 +805,10 @@ async function runCleanStartupSuite(runner) {
     );
   } catch (err) {
     runner.recordCheck(false, `Electron startup failed: ${err.message}`, err);
+  } finally {
+    try {
+      fs.rmSync(tmpUserData, { recursive: true, force: true });
+    } catch (_) {}
   }
 }
 
