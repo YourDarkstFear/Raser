@@ -242,7 +242,7 @@
           this.normLimiter.connect(this.analyserNode);
           this.analyserNode.connect(this.fadeGain);
           this.fadeGain.connect(this.ctx.destination);
-          this.eqHigh.connect(this.levelAnalyser);
+          this.bus.connect(this.levelAnalyser);
 
           this.graphInitialized = true;
           this._updateRouting();
@@ -311,6 +311,9 @@
       }
 
       this.bus.connect(this.dryGain);
+      if (this.levelAnalyser) {
+        this.bus.connect(this.levelAnalyser);
+      }
       this.dryGain.connect(this.masterGain);
 
       if (isDistortionOn) {
