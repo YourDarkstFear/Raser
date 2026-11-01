@@ -793,6 +793,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             return (!p || !b.includes(p)) && (!id || !b.includes(id));
                           }),
                           syncedLyrics: [],
+                          lyricsManualOffset: 0,
                           glitchTimes: [],
                           lastGlitchedIndex: -1,
                           isGlitching: false,
@@ -2074,6 +2075,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                           btnAddCustomLyrics: document.getElementById('btn-add-custom-lyrics'),
                           btnSyncLyrics: document.getElementById('btn-sync-lyrics'),
+                          lyricsOffsetBar: document.getElementById('lyrics-offset-bar'),
+                          lyricsOffsetVal: document.getElementById('lyrics-offset-val'),
+                          btnLyricsOffsetReset: document.getElementById('btn-lyrics-offset-reset'),
                           customLyricsModal: document.getElementById('custom-lyrics-modal'),
                           customLyricsTextarea: document.getElementById('custom-lyrics-textarea'),
                           customLyricsTrackTitle: document.getElementById('custom-lyrics-track-title'),
@@ -4388,6 +4392,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 22000);
 
     state.currentTrack = track;
+    state.lyricsManualOffset = typeof getTrackLyricsOffset === 'function' ? getTrackLyricsOffset(track) : 0;
+    if (typeof updateLyricsOffsetUI === 'function') updateLyricsOffsetUI();
     emitPluginEvent('trackchange', track);
     state.currentTrackContext = context;
     state.currentTrackIndexInContext = startIndex;
@@ -4728,6 +4734,104 @@ document.addEventListener('DOMContentLoaded', async () => {
     return words.length > 0 ? words : null;
   }
 
+  function parseLrc(lrcText) {
+    if (!lrcText || typeof lrcText !== 'string') return [];
+    const lines = lrcText.split(/\r?\n/);
+    const result = [];
+    let offsetSec = 0;
+    const offsetMatch = lrcText.match(/\[offset:\s*([+-]?\d+)\s*\]/i);
+    if (offsetMatch) {
+      offsetSec = parseInt(offsetMatch[1], 10) / 1000;
+    }
+
+    const tagRegex = /\[(\d{1,2}):(\d{1,2}(?:[:.]\d{1,3})?)\]/g;
+    const metaHeaderRegex = /^\[(ti|ar|al|by|offset|length|re|ve|id|hash|sign|qq|total):[^\]]*\]$/i;
+    const headerStripRegex = /\[(?!(?:\d+:\d+|instrumental|music|intro|outro|solo)\b)[^\]]*\]/gi;
+
+    const gapPattern1 = /^[\s♪♫\-–—.]*$/;
+    const gapPattern2 = /^[\(\[]?\s*(?:instrumental|music|intro|outro|solo|interlude|break)\s*[\)\]]?$/i;
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) continue;
+      if (metaHeaderRegex.test(trimmedLine)) continue;
+
+      const timestamps = [];
+      let match;
+      tagRegex.lastIndex = 0;
+      while ((match = tagRegex.exec(line)) !== null) {
+        const min = parseInt(match[1], 10);
+        const sec = parseFloat(match[2].replace(':', '.'));
+        timestamps.push(min * 60 + sec + offsetSec);
+      }
+
+      const cleanRaw = line.replace(tagRegex, '').replace(headerStripRegex, '').trim();
+      if (timestamps.length > 0) {
+        for (const t of timestamps) {
+          const time = Math.max(0, Math.round(t * 1000) / 1000);
+          if (!cleanRaw || gapPattern1.test(cleanRaw) || gapPattern2.test(cleanRaw)) {
+            result.push({ time, text: '', isGap: true });
+          } else {
+            const cleanText = cleanRaw.replace(/<[^>]+>/g, '').trim();
+            const enhWords = typeof parseEnhancedLrcWords === 'function' ? parseEnhancedLrcWords(cleanRaw, time, time + 4.0) : undefined;
+            result.push({ time, text: cleanText, words: enhWords || undefined });
+          }
+        }
+      } else if (cleanRaw) {
+        if (gapPattern1.test(cleanRaw) || gapPattern2.test(cleanRaw)) {
+          result.push({ time: -1, text: '', isGap: true });
+        } else {
+          result.push({ time: -1, text: cleanRaw.replace(/<[^>]+>/g, '').trim() });
+        }
+      }
+    }
+
+    return result.sort((a, b) => {
+      if (a.time < 0 && b.time >= 0) return 1;
+      if (a.time >= 0 && b.time < 0) return -1;
+      return a.time - b.time;
+    });
+  }
+  window.parseLrc = parseLrc;
+
+  function getTrackLyricsOffset(track) {
+    if (!track) return 0;
+    const cid = (typeof getTrackCanonicalId === 'function' ? getTrackCanonicalId(track) : '') || track.id || (track.artist + '_' + track.title);
+    if (!cid) return 0;
+    try {
+      const map = JSON.parse(localStorage.getItem('riff_lyrics_offsets') || '{}');
+      return typeof map[cid] === 'number' ? map[cid] : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+  window.getTrackLyricsOffset = getTrackLyricsOffset;
+
+  function setTrackLyricsOffset(track, offsetSec) {
+    if (!track) return;
+    const cid = (typeof getTrackCanonicalId === 'function' ? getTrackCanonicalId(track) : '') || track.id || (track.artist + '_' + track.title);
+    if (!cid) return;
+    try {
+      const map = JSON.parse(localStorage.getItem('riff_lyrics_offsets') || '{}');
+      if (offsetSec === 0) {
+        delete map[cid];
+      } else {
+        map[cid] = Math.round(offsetSec * 10) / 10;
+      }
+      localStorage.setItem('riff_lyrics_offsets', JSON.stringify(map));
+    } catch (_) {}
+  }
+  window.setTrackLyricsOffset = setTrackLyricsOffset;
+
+  function updateLyricsOffsetUI() {
+    const elVal = document.getElementById('lyrics-offset-val');
+    if (!elVal) return;
+    const offset = typeof state.lyricsManualOffset === 'number' ? state.lyricsManualOffset : 0;
+    elVal.textContent = `${offset > 0 ? '+' : ''}${offset.toFixed(1)}s`;
+    elVal.style.color = offset === 0 ? 'var(--md-sys-color-on-surface-variant)' : 'var(--md-sys-color-primary)';
+  }
+  window.updateLyricsOffsetUI = updateLyricsOffsetUI;
+
   function stringNormalizedSimilarity(a, b) {
     const normA = (a || '').toLowerCase().replace(/[^a-z0-9\u0400-\u04ff\u4e00-\u9fa5]/gi, '');
     const normB = (b || '').toLowerCase().replace(/[^a-z0-9\u0400-\u04ff\u4e00-\u9fa5]/gi, '');
@@ -4992,39 +5096,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       state.isCustomLyrics = !!data.isCustom;
 
       const raw = data.lyrics;
-      const lines = raw.split('\n');
-      let parsed = [];
-      const lrcRegex = /\[(\d+):(\d+(\.\d+)?)\](.*)/;
-      const headerRegex = /\[(?!(?:\d+:\d+|instrumental|music|intro|outro|solo)\b)[^\]]*\]/gi;
-
       const gapPattern1 = /^[\s♪♫\-–—.]*$/;
       const gapPattern2 = /^[\(\[]?\s*(?:instrumental|music|intro|outro|solo|interlude|break)\s*[\)\]]?$/i;
-
-      for (const line of lines) {
-        const match = lrcRegex.exec(line);
-        if (match) {
-          const min = parseInt(match[1], 10);
-          const sec = parseFloat(match[2]);
-          const rawText = match[4].replace(headerRegex, '').trim();
-          const lineTime = min * 60 + sec;
-          if (!rawText || gapPattern1.test(rawText) || gapPattern2.test(rawText)) {
-            parsed.push({ time: lineTime, text: '', isGap: true });
-            continue;
-          }
-          const cleanText = rawText.replace(/<[^>]+>/g, '').trim();
-          const enhWords = parseEnhancedLrcWords(rawText, lineTime, lineTime + 4.0);
-          parsed.push({ time: lineTime, text: cleanText, words: enhWords || undefined });
-        } else {
-          const cleanPlain = line.replace(headerRegex, '').trim();
-          if (cleanPlain) {
-            if (gapPattern1.test(cleanPlain) || gapPattern2.test(cleanPlain)) {
-              parsed.push({ time: -1, text: '', isGap: true });
-            } else {
-              parsed.push({ time: -1, text: cleanPlain });
-            }
-          }
-        }
-      }
+      let parsed = parseLrc(raw);
 
       if (parsed.length === 0) {
         if (el.lyricsStatus) el.lyricsStatus.textContent = '';
@@ -5287,7 +5361,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (startTime >= 0) validLines.push({ time: startTime, index: i });
     }
     const lookAhead = state.isCustomLyrics ? 0.25 : 0.0;
-    const matchTime = currentTime + lookAhead;
+    const manualOffset = typeof state.lyricsManualOffset === 'number' ? state.lyricsManualOffset : 0;
+    const matchTime = currentTime + lookAhead + manualOffset;
     for (let i = 0; i < validLines.length; i++) {
       const current = validLines[i];
       const next = validLines[i + 1];
@@ -5963,7 +6038,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const lookAhead = state.isCustomLyrics ? 0.25 : 0.0;
-    const matchTime = currentTime + lookAhead;
+    const manualOffset = typeof state.lyricsManualOffset === 'number' ? state.lyricsManualOffset : 0;
+    const matchTime = currentTime + lookAhead + manualOffset;
 
     for (let i = 0; i < validLines.length; i++) {
       const current = validLines[i];
@@ -7412,6 +7488,35 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (e.target === el.customLyricsModal) closeCustomLyricsEditor();
     });
   }
+
+  function initLyricsOffsetControls() {
+    const bar = el.lyricsOffsetBar || document.getElementById('lyrics-offset-bar');
+    if (!bar) return;
+    const btns = bar.querySelectorAll('.lyrics-offset-btn[data-offset]');
+    btns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const delta = parseFloat(btn.dataset.offset);
+        if (isNaN(delta)) return;
+        state.lyricsManualOffset = Math.round(((state.lyricsManualOffset || 0) + delta) * 10) / 10;
+        setTrackLyricsOffset(state.currentTrack, state.lyricsManualOffset);
+        updateLyricsOffsetUI();
+        if (el.nativeAudio) updateSyncedLyricsHighlight(el.nativeAudio.currentTime || 0);
+      });
+    });
+    const btnReset = el.btnLyricsOffsetReset || document.getElementById('btn-lyrics-offset-reset');
+    if (btnReset) {
+      btnReset.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.lyricsManualOffset = 0;
+        setTrackLyricsOffset(state.currentTrack, 0);
+        updateLyricsOffsetUI();
+        if (el.nativeAudio) updateSyncedLyricsHighlight(el.nativeAudio.currentTime || 0);
+      });
+    }
+    updateLyricsOffsetUI();
+  }
+  initLyricsOffsetControls();
 
   syncState = {
     active: false,
@@ -26663,3 +26768,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { parseLrc, getTrackLyricsOffset, setTrackLyricsOffset };
+}

@@ -5197,7 +5197,7 @@ async function fetchKugouLyrics(title, artist, durationSec = 0) {
     if (!dlJson || !dlJson.content) return null;
 
     let lrcText = Buffer.from(dlJson.content, 'base64').toString('utf8');
-    lrcText = lrcText.replace(/^\[(id|ti|ar|al|by|hash|sign|qq|total|offset):[^\]]*\]\r?\n?/gim, '').trim();
+    lrcText = lrcText.replace(/^\[(id|ti|ar|al|by|hash|sign|qq|total):[^\]]*\]\r?\n?/gim, '').trim();
 
     if (lrcText) {
       return { syncedLyrics: lrcText, plainLyrics: '' };
