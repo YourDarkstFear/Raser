@@ -40,6 +40,24 @@ function listenPort() {
 }
 const { DATA_DIR, CACHE_DIR, CUSTOM_LYRICS_DIR, LYRICS_DIR, THUMBNAILS_DIR, METADATA_PATH, LIBRARY_DIR, LIBRARY_PATH, ytDlpCommand, resolveDownloadDir, defaultDownloadDir, resolveBinary, clearBinaryCache, cookieJarHasYtLogin, jsRuntime } = require('../shared/platform');
 const YT_COOKIES_FILE = path.join(DATA_DIR, 'yt-cookies.txt');
+const activeTempCookieJars = new Set();
+function cleanupStaleCookieJars() {
+  for (const p of activeTempCookieJars) {
+    try { if (fs.existsSync(p)) fs.unlinkSync(p); } catch (_) {}
+  }
+  activeTempCookieJars.clear();
+  try {
+    if (fs.existsSync(DATA_DIR)) {
+      const files = fs.readdirSync(DATA_DIR);
+      for (const f of files) {
+        if (f.startsWith('.yt-cookies-') && f.endsWith('.tmp')) {
+          try { fs.unlinkSync(path.join(DATA_DIR, f)); } catch (_) {}
+        }
+      }
+    }
+  } catch (_) {}
+}
+process.once('exit', cleanupStaleCookieJars);
 
 // A browser cookie export can contain .google.com session cookies without the
 // user actually being signed in to YouTube. Passing those to yt-dlp makes the
@@ -1741,8 +1759,27 @@ function executeYtDlp(args, timeoutMs = 15000, opts = {}) {
       if (!cookieJarPath) return;
       const p = cookieJarPath;
       cookieJarPath = null;
-      try { fs.unlinkSync(p); } catch (_) {}
+      activeTempCookieJars.delete(p);
+      try {
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      } catch (_) {}
     };
+
+    let settled = false;
+    let timer = null;
+    const safeResolve = (val) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      try { cleanupCookieJar(); } finally { resolve(val); }
+    };
+    const safeReject = (err) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      try { cleanupCookieJar(); } finally { reject(err); }
+    };
+
     if (!finalArgs.includes('--force-ipv4')) prependFlags.push('--force-ipv4');
     if (!finalArgs.includes('--geo-bypass')) prependFlags.push('--geo-bypass');
     const runtime = jsRuntime();
@@ -1758,6 +1795,7 @@ function executeYtDlp(args, timeoutMs = 15000, opts = {}) {
       try {
         cookieJarPath = path.join(DATA_DIR, `.yt-cookies-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.tmp`);
         fs.copyFileSync(YT_COOKIES_FILE, cookieJarPath);
+        activeTempCookieJars.add(cookieJarPath);
         prependFlags.push('--cookies', cookieJarPath);
       } catch (_) {
         cleanupCookieJar();
@@ -1781,63 +1819,63 @@ function executeYtDlp(args, timeoutMs = 15000, opts = {}) {
         finalArgs.unshift('--proxy', '');
       }
     }
-    const cmd = ytDlpCommand(finalArgs);
-    const YTDLP_PATH = cmd.bin;
-    const proc = spawn(YTDLP_PATH, cmd.args, { windowsHide: true, env: cleanEnv });
-    if (opts && typeof opts.onChild === 'function') {
-      try { opts.onChild(proc); } catch (_) {}
-    }
-    let stdout = '';
-    let stderr = '';
-    const outDecoder = new StringDecoder('utf8');
-    const errDecoder = new StringDecoder('utf8');
-    let timer = null;
 
-    if (timeoutMs > 0) {
-      timer = setTimeout(() => {
-        try { proc.kill('SIGKILL'); } catch (e) {}
-        cleanupCookieJar();
-        reject(new Error(`yt-dlp timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-    }
+    try {
+      const cmd = ytDlpCommand(finalArgs);
+      const YTDLP_PATH = cmd.bin;
+      const proc = spawn(YTDLP_PATH, cmd.args, { windowsHide: true, env: cleanEnv });
+      if (opts && typeof opts.onChild === 'function') {
+        try { opts.onChild(proc); } catch (_) {}
+      }
+      let stdout = '';
+      let stderr = '';
+      const outDecoder = new StringDecoder('utf8');
+      const errDecoder = new StringDecoder('utf8');
 
-    proc.stdout.on('data', (d) => { stdout += outDecoder.write(d); });
-    proc.stderr.on('data', (d) => { stderr += errDecoder.write(d); });
+      if (timeoutMs > 0) {
+        timer = setTimeout(() => {
+          try { proc.kill('SIGKILL'); } catch (e) {}
+          safeReject(new Error(`yt-dlp timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }
 
-    proc.on('close', (code) => {
-      if (timer) clearTimeout(timer);
-      cleanupCookieJar();
-      if (code === 0) {
-        resolve(stdout);
-      } else {
-        const firstArgs = (args || []).slice(0, 3).join(' ');
-        const errSnippet = String(stderr || `code ${code}`).slice(0, 300);
-        const isWarn = !stderr || /not available|unavailable|private video|timed out/i.test(errSnippet);
-        if (!opts.quiet) {
-          try { logger.log(isWarn ? 'warn' : 'error', `yt-dlp failed: ${firstArgs} - ${errSnippet}`); } catch (_) {}
+      proc.stdout.on('data', (d) => { stdout += outDecoder.write(d); });
+      proc.stderr.on('data', (d) => { stderr += errDecoder.write(d); });
+
+      proc.on('close', (code) => {
+        if (code === 0) {
+          safeResolve(stdout);
+        } else {
+          const firstArgs = (args || []).slice(0, 3).join(' ');
+          const errSnippet = String(stderr || `code ${code}`).slice(0, 300);
+          const isWarn = !stderr || /not available|unavailable|private video|timed out/i.test(errSnippet);
+          if (!opts.quiet) {
+            try { logger.log(isWarn ? 'warn' : 'error', `yt-dlp failed: ${firstArgs} - ${errSnippet}`); } catch (_) {}
+          }
+          safeReject(new Error(stderr || `yt-dlp exited with code ${code}`));
         }
-        reject(new Error(stderr || `yt-dlp exited with code ${code}`));
-      }
-    });
+      });
 
-    proc.on('error', (err) => {
-      if (timer) clearTimeout(timer);
-      cleanupCookieJar();
-      const firstArgs = (args || []).slice(0, 3).join(' ');
-      const errSnippet = String(err && err.message ? err.message : err).slice(0, 300);
-      try { logger.log('error', `yt-dlp spawn error: ${firstArgs} - ${errSnippet}`); } catch (_) {}
-      // A managed yt-dlp can disappear between resolution and spawn (failed
-      // self-update, cleared data dir). Drop the stale cache entry and retry
-      // once so we can fall back to a binary from PATH.
-      if (err && err.code === 'ENOENT' && !opts.retried) {
-        clearBinaryCache();
-        try {
-          resolveBinary('yt-dlp');
-        } catch (_) {}
-        return executeYtDlp(args, timeoutMs, Object.assign({}, opts, { retried: true })).then(resolve, reject);
-      }
-      reject(err);
-    });
+      proc.on('error', (err) => {
+        const firstArgs = (args || []).slice(0, 3).join(' ');
+        const errSnippet = String(err && err.message ? err.message : err).slice(0, 300);
+        try { logger.log('error', `yt-dlp spawn error: ${firstArgs} - ${errSnippet}`); } catch (_) {}
+        // A managed yt-dlp can disappear between resolution and spawn (failed
+        // self-update, cleared data dir). Drop the stale cache entry and retry
+        // once so we can fall back to a binary from PATH.
+        if (err && err.code === 'ENOENT' && !opts.retried) {
+          cleanupCookieJar();
+          clearBinaryCache();
+          try {
+            resolveBinary('yt-dlp');
+          } catch (_) {}
+          return executeYtDlp(args, timeoutMs, Object.assign({}, opts, { retried: true })).then(safeResolve, safeReject);
+        }
+        safeReject(err);
+      });
+    } catch (spawnErr) {
+      safeReject(spawnErr);
+    }
   });
 }
 
@@ -8757,12 +8795,7 @@ function writePortFile(p) {
 function startServer(port = PORT) {
   try {
     require('./tools').cleanupStalePyinstallerDirs();
-    const files = fs.readdirSync(DATA_DIR);
-    for (const f of files) {
-      if (f.startsWith('.yt-cookies-') && f.endsWith('.tmp')) {
-        try { fs.unlinkSync(path.join(DATA_DIR, f)); } catch (_) {}
-      }
-    }
+    cleanupStaleCookieJars();
   } catch (_) {}
   if (server.listening) {
     const address = server.address();
@@ -8792,6 +8825,7 @@ function startServer(port = PORT) {
 }
 
 function stopServer() {
+  cleanupStaleCookieJars();
   if (!server.listening) return Promise.resolve();
   return new Promise((resolve, reject) => {
     server.close((error) => {
