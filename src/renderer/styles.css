@@ -2899,7 +2899,7 @@ body.perf .lyric-gap-bars .gap-bar {
   right: 16px;
   width: calc(100% - 32px);
   height: 36px;
-  bottom: calc(100% - 4px);
+  bottom: 100%;
   pointer-events: none;
   z-index: -1;
   opacity: var(--bar-viz-opacity, 0.22);
