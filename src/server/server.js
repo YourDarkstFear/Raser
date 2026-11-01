@@ -646,6 +646,7 @@ function verifyStreamPlayable(streamUrl, userAgent, redirectsLeft = 3) {
       if (!userAgent) {
         if (cParam === 'IOS') ua = 'com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)';
         else if (cParam === 'ANDROID_VR') ua = 'com.google.android.apps.youtube.vr.oculus/1.61.48 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip';
+        else if (cParam.startsWith('ANDROID')) ua = 'com.google.android.youtube/19.44.38 (Linux; U; Android 14; en_US; sdk_gphone64_x86_64 Build/UE1A.230829.036) gzip';
       }
       const isGooglevideo = parsed.hostname.endsWith('googlevideo.com');
       const req = https.request(streamUrl, {
@@ -2806,11 +2807,11 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
   try {
     needYtAuth = false;
     const isYt = platform === 'youtube' || platform === 'ytmusic' || (trackUrl && (trackUrl.includes('youtube.com') || trackUrl.includes('youtu.be')));
-    let ytDlpQualityFormat = 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/18/best';
+    let ytDlpQualityFormat = 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/ba/b/18/best';
     if (quality === 'low') {
-      ytDlpQualityFormat = 'worstaudio[ext=m4a]/worstaudio/bestaudio/18/best';
+      ytDlpQualityFormat = 'worstaudio[ext=m4a]/worstaudio/bestaudio/ba/b/18/best';
     } else if (quality === 'high' || quality === 'max') {
-      ytDlpQualityFormat = 'bestaudio/18/best';
+      ytDlpQualityFormat = 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/ba/b/18/best';
     }
 
     const audioFormat = (forShare || platform === 'soundcloud' || isSc)
@@ -2868,10 +2869,10 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
       // YouTube Origin header. Try it cookie-free first: it is the fastest and
       // most reliable path, and cookies can trigger "unavailable (152-18)".
       const attempts = [];
+      attempts.push({ clientSpec: 'android,web', cookies: false });
+      if (hasCookies) attempts.push({ clientSpec: 'android,web', cookies: true });
       attempts.push({ clientSpec: 'default', cookies: false });
-      attempts.push({ clientSpec: 'web_embedded,web,tv', cookies: false });
-      if (hasCookies) attempts.push({ clientSpec: 'web_embedded,web,tv', cookies: true });
-      attempts.push({ clientSpec: 'ios', cookies: false });
+      attempts.push({ clientSpec: 'tv,mweb', cookies: false });
       if (hasCookies) attempts.push({ clientSpec: 'default', cookies: true });
       let lastAttemptError = '';
       let stopAttempts = false;
@@ -8562,7 +8563,15 @@ function writePortFile(p) {
 }
 
 function startServer(port = PORT) {
-  try { require('./tools').cleanupStalePyinstallerDirs(); } catch (_) {}
+  try {
+    require('./tools').cleanupStalePyinstallerDirs();
+    const files = fs.readdirSync(DATA_DIR);
+    for (const f of files) {
+      if (f.startsWith('.yt-cookies-') && f.endsWith('.tmp')) {
+        try { fs.unlinkSync(path.join(DATA_DIR, f)); } catch (_) {}
+      }
+    }
+  } catch (_) {}
   if (server.listening) {
     const address = server.address();
     return Promise.resolve(address && typeof address === 'object' ? address.port : port);
