@@ -10697,11 +10697,18 @@ body:not(.classic-sidebar):not(.mini) .playbar {
   height: 96px !important;
   border-radius: 0 !important;
   padding: 6px 18px 10px 18px !important;
+  background: color-mix(in srgb, var(--panel-bg) 75%, transparent) !important;
+  backdrop-filter: blur(20px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.8) !important;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.18) !important;
+  border: none !important;
+  border-top: 1px solid var(--md-sys-color-outline-variant, rgba(255, 255, 255, 0.1)) !important;
+}
+
+body.perf:not(.classic-sidebar):not(.mini) .playbar {
   background: var(--panel-bg) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
-  border: none !important;
 }
 
 body:not(.classic-sidebar):not(.mini) .playbar::after {
