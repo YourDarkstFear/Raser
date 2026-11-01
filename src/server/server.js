@@ -3050,16 +3050,32 @@ async function handleStreamInfo(req, res, trackUrl, trackId, platform = 'youtube
 
         const remaining = rankedCandidates.slice(1);
         if (remaining.length > 0) {
-          const streamResults = await Promise.all(remaining.map(async ({ cand }) => {
-            try {
-              const url = await resolveYtCandidateStream(cand.id);
-              return url ? { url, id: cand.id } : null;
-            } catch (_) {
-              return null;
+          let found = null;
+          let idx = 0;
+          const CONCURRENCY = 2;
+
+          const worker = async () => {
+            while (idx < remaining.length && !found) {
+              const current = remaining[idx++];
+              if (!current || !current.cand || found) break;
+              try {
+                const url = await resolveYtCandidateStream(current.cand.id);
+                if (url && !found) {
+                  found = { url, id: current.cand.id };
+                  break;
+                }
+              } catch (_) {}
             }
-          }));
-          const bestMatch = streamResults.find(result => result !== null);
-          if (bestMatch) return sendStreamResponse(bestMatch.url, bestMatch.id);
+          };
+
+          const workerCount = Math.min(CONCURRENCY, remaining.length);
+          const workers = [];
+          for (let w = 0; w < workerCount; w++) {
+            workers.push(worker());
+          }
+          await Promise.all(workers);
+
+          if (found) return sendStreamResponse(found.url, found.id);
         }
       }
 
