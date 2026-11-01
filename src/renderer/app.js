@@ -5714,7 +5714,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  const CUSTOM_SHIFT_LEAD_SECONDS = 4.0;
+  const CUSTOM_SHIFT_LEAD_SECONDS = 0.25;
 
   function getLineStartTime(idx) {
     const lines = state.syncedLyrics;
@@ -5722,10 +5722,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const raw = lines[idx].time;
     if (raw < 0) return -1;
     if (!state.isCustomLyrics) return raw;
-    for (let j = idx - 1; j >= 0; j--) {
-      if (lines[j].time >= 0) return lines[j].time;
-    }
-    return Math.max(0, raw - CUSTOM_SHIFT_LEAD_SECONDS);
+    return Math.max(0, raw - (typeof CUSTOM_SHIFT_LEAD_SECONDS === 'number' ? CUSTOM_SHIFT_LEAD_SECONDS : 0.25));
   }
 
   function getLineEndTime(idx) {
