@@ -729,6 +729,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     queue: [],
     queueIndex: -1,
     queueHistory: [],
+    playHistory: [],
+    futureHistory: [],
     currentTrack: null,
     currentTrackContext: null,
     currentTrackIndexInContext: -1,
@@ -4070,10 +4072,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   function pushPlayHistory(track) {
     if (!track) return;
     const h = state.playHistory || (state.playHistory = []);
-    if (h.length && h[h.length - 1].id === track.id) return;
+    if (h.length && isSameTrack(h[h.length - 1], track)) return;
     h.push(track);
-    if (h.length > 100) h.shift();
+    if (h.length > 150) h.shift();
   }
+  let navigatingHistory = false;
   let navigatingBack = false;
 
   const lastfmState = {
@@ -4300,7 +4303,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     resetLevelWatcher();
     vizPrev = null;
-    if (state.currentTrack && state.currentTrack.id !== track.id && !navigatingBack) pushPlayHistory(state.currentTrack);
+    if (state.currentTrack && !isSameTrack(state.currentTrack, track) && !navigatingHistory && !navigatingBack) {
+      pushPlayHistory(state.currentTrack);
+    }
+    if (!navigatingHistory && !navigatingBack) {
+      state.futureHistory = [];
+    }
 
     if (!state._isNaturalEnding && state.myWaveActive && state.currentTrack && !isSameTrack(state.currentTrack, track)) {
       const curId = (typeof getTrackCanonicalId === 'function' ? getTrackCanonicalId(state.currentTrack) : '') || state.currentTrack.id;
@@ -7888,6 +7896,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (syncState && syncState.active) return;
     if (state.queue.length === 0) return;
 
+    const fh = state.futureHistory || (state.futureHistory = []);
+    if (fh.length > 0) {
+      const next = fh.pop();
+      if (state.currentTrack && !isSameTrack(state.currentTrack, next)) {
+        pushPlayHistory(state.currentTrack);
+      }
+      navigatingHistory = true;
+      navigatingBack = false;
+      try {
+        const nextIdx = state.queue.findIndex(t => isSameTrack(t, next));
+        if (nextIdx !== -1) {
+          state.queueIndex = nextIdx;
+          recordPlayedIndex(nextIdx);
+        }
+        await playTrack(next);
+      } finally {
+        navigatingHistory = false;
+        navigatingBack = false;
+      }
+      return;
+    }
+
     if (!state._isNaturalEnding && state.myWaveActive && state.currentTrack) {
       const cur = (el.nativeAudio && typeof el.nativeAudio.currentTime === 'number') ? el.nativeAudio.currentTime : 0;
       if (cur < 12 && typeof recordWaveSkip === 'function') {
@@ -8000,42 +8030,57 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  function playPrev() {
+  let lastPrevClickTime = 0;
+
+  async function playPrev() {
     if (syncState && syncState.active) return;
-    if (el.nativeAudio && el.nativeAudio.currentTime > 3) {
+
+    const now = Date.now();
+    if (el.nativeAudio && el.nativeAudio.currentTime > 3 && (now - lastPrevClickTime > 2000)) {
+      lastPrevClickTime = now;
       el.nativeAudio.currentTime = 0;
       return;
     }
-    {
-      const h = state.playHistory || [];
-      if (h.length) {
-        const prev = h.pop();
-        navigatingBack = true;
-        try { playTrack(prev); } finally { navigatingBack = false; }
-        const prevIdx = state.queue.findIndex(t => t.id === prev.id || isSameTrack(t, prev));
-        if (prevIdx !== -1) state.queueIndex = prevIdx;
-        return;
+    lastPrevClickTime = now;
+
+    const h = state.playHistory || (state.playHistory = []);
+    if (h.length > 0) {
+      const prev = h.pop();
+      if (state.currentTrack && !isSameTrack(state.currentTrack, prev)) {
+        if (!state.futureHistory) state.futureHistory = [];
+        state.futureHistory.push(state.currentTrack);
       }
+      navigatingHistory = true;
+      navigatingBack = true;
+      try {
+        const prevIdx = state.queue.findIndex(t => isSameTrack(t, prev));
+        if (prevIdx !== -1) state.queueIndex = prevIdx;
+        await playTrack(prev);
+      } finally {
+        navigatingHistory = false;
+        navigatingBack = false;
+      }
+      return;
     }
+
     if (state.queue.length === 0) return;
 
-    const h = state.queueHistory;
-    if (h.length > 1) {
-      h.pop();
-      const prevIdx = h[h.length - 1];
-      if (prevIdx >= 0 && prevIdx < state.queue.length) {
-        state.queueIndex = prevIdx;
-        playTrack(state.queue[prevIdx]);
-        return;
-      }
-      h.push(state.queueIndex);
+    if (state.isShuffle) {
+      if (el.nativeAudio) el.nativeAudio.currentTime = 0;
+      return;
     }
 
     let prevIdx = state.queueIndex - 1;
-    if (prevIdx < 0) prevIdx = state.queue.length - 1;
+    if (prevIdx < 0) {
+      if (state.repeatMode === 'all') {
+        prevIdx = state.queue.length - 1;
+      } else {
+        if (el.nativeAudio) el.nativeAudio.currentTime = 0;
+        return;
+      }
+    }
     state.queueIndex = prevIdx;
-    state.queueHistory = [prevIdx];
-    playTrack(state.queue[prevIdx]);
+    await playTrack(state.queue[prevIdx]);
   }
 
   if (el.nativeAudio) {
@@ -14324,6 +14369,8 @@ function bindCoverHoldZoom(wrapEl) {
       state.queue = [];
       state.queueIndex = -1;
       state.queueHistory = [];
+      state.playHistory = [];
+      state.futureHistory = [];
       updateQueueBadge();
       renderQueueView();
     });
@@ -22649,6 +22696,7 @@ function bindCoverHoldZoom(wrapEl) {
       }
       state.isRadioQueue = false;
       state.queueHistory = [];
+      state.futureHistory = [];
       if (!state.isShuffle) {
         state.isShuffle = true;
         localStorage.setItem('riff_shuffle', '1');
