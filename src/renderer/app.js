@@ -27031,6 +27031,8 @@ function bindCoverHoldZoom(wrapEl) {
     function updateTopNavUI() {
       const profile = window.RaserAccount.getActiveProfile();
       if (!profile) return;
+      const isAuthed = !!(window.RaserFirebase && window.RaserFirebase.getCurrentUser());
+
       const pillAvatar = document.getElementById('user-pill-avatar');
       const pillName = document.getElementById('user-pill-name');
       const ddAvatar = document.getElementById('dropdown-user-avatar');
@@ -27039,11 +27041,11 @@ function bindCoverHoldZoom(wrapEl) {
       const ddCode = document.getElementById('dropdown-user-code');
 
       if (pillAvatar) pillAvatar.src = profile.avatar || window.RaserAccount.DEFAULT_AVATARS[0];
-      if (pillName) pillName.textContent = profile.displayName || profile.username || 'User';
+      if (pillName) pillName.textContent = isAuthed ? (profile.displayName || profile.username || 'Profil') : 'Giriş Yap';
       if (ddAvatar) ddAvatar.src = profile.avatar || window.RaserAccount.DEFAULT_AVATARS[0];
-      if (ddName) ddName.textContent = profile.displayName || 'User';
-      if (ddHandle) ddHandle.textContent = '@' + (profile.username || 'user');
-      if (ddCode) ddCode.textContent = profile.code || 'RS-MOTIVE';
+      if (ddName) ddName.textContent = isAuthed ? (profile.displayName || 'Kullanıcı') : 'Misafir Kullanıcı';
+      if (ddHandle) ddHandle.textContent = isAuthed ? ('@' + (profile.username || 'user')) : 'Oturum açılmadı';
+      if (ddCode) ddCode.textContent = isAuthed ? (profile.code || 'RS-MOTIVE') : 'Giriş Yap / Kayıt Ol';
     }
 
     updateTopNavUI();
@@ -27842,11 +27844,13 @@ function bindCoverHoldZoom(wrapEl) {
     const bioEl = document.getElementById('profile-bio-display');
     const genresEl = document.getElementById('profile-genres-display');
 
+    const isAuthed = !!(window.RaserFirebase && window.RaserFirebase.getCurrentUser());
+
     if (avImg) avImg.src = profile.avatar || window.RaserAccount.DEFAULT_AVATARS[0];
-    if (nameEl) nameEl.textContent = profile.displayName || 'User';
-    if (handleEl) handleEl.textContent = '@' + (profile.username || 'user');
+    if (nameEl) nameEl.textContent = isAuthed ? (profile.displayName || 'Kullanıcı') : 'Misafir';
+    if (handleEl) handleEl.textContent = isAuthed ? ('@' + (profile.username || 'user')) : '@misafir';
     if (codeEl) codeEl.textContent = profile.code || 'RS-MOTIVE';
-    if (bioEl) bioEl.textContent = profile.bio || 'Music enthusiast';
+    if (bioEl) bioEl.textContent = profile.bio || (isAuthed ? '' : 'Giriş yaparak müziğini ve arkadaşlarını bulutla senkronize et.');
 
     if (genresEl) {
       genresEl.innerHTML = '';
@@ -27858,9 +27862,9 @@ function bindCoverHoldZoom(wrapEl) {
       });
     }
 
-    // Counters
-    const fCount = (profile.following || []).length;
-    const flwCount = profile.followersCount || 14;
+    // Counters (pure real data, no fake counts)
+    const fCount = Array.isArray(profile.following) ? profile.following.length : 0;
+    const flwCount = typeof profile.followersCount === 'number' ? profile.followersCount : 0;
     const stats = profile.stats || { totalPlays: 0, totalDurationMinutes: 0, topArtists: {}, topTracks: [] };
 
     const cFollowing = document.getElementById('stat-following-count');

@@ -2,10 +2,10 @@
 (function(window) {
   'use strict';
 
-  const STORAGE_KEY_PROFILES = 'raser_accounts_v1';
-  const STORAGE_KEY_ACTIVE = 'raser_active_account_id_v1';
-  const STORAGE_KEY_ACTIVITY = 'raser_friend_activity_v1';
-  const STORAGE_KEY_NOTES = 'raser_track_notes_v1';
+  const STORAGE_KEY_PROFILES = 'raser_accounts_v2';
+  const STORAGE_KEY_ACTIVE = 'raser_active_account_id_v2';
+  const STORAGE_KEY_ACTIVITY = 'raser_friend_activity_v2';
+  const STORAGE_KEY_NOTES = 'raser_track_notes_v2';
 
   // Default avatars available
   const DEFAULT_AVATARS = [
@@ -23,78 +23,23 @@
     return code;
   }
 
-  function createDefaultProfile(username = 'hamza', displayName = 'Hamza') {
+  function createDefaultProfile(username = 'misafir', displayName = 'Misafir') {
     return {
-      id: 'usr_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      id: 'guest_' + Date.now().toString(36),
       code: generateUserCode(),
-      username: username.toLowerCase().replace(/[^a-z0-9_]/g, '') || 'user',
-      displayName: displayName || 'User',
+      username: username.toLowerCase().replace(/[^a-z0-9_]/g, '') || 'misafir',
+      displayName: displayName || 'Misafir',
       avatar: DEFAULT_AVATARS[0],
-      bio: 'Music enthusiast 🎧 | Hip-Hop & Rap lover',
-      genres: ['Hip-Hop', 'Rap', 'Turkish Trap', 'R&B'],
+      bio: '',
+      genres: [],
       createdAt: Date.now(),
-      following: [
-        {
-          id: 'u_betul',
-          code: 'RS-982144',
-          username: 'betul',
-          displayName: 'Betül',
-          avatar: DEFAULT_AVATARS[1],
-          bio: 'Sound designer & curator ✨',
-          lastTrack: {
-            title: 'YIN YANG',
-            artist: 'Motive',
-            time: 'Listening now',
-            playing: true,
-            cover: 'https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg'
-          }
-        },
-        {
-          id: 'u_kaan',
-          code: 'RS-471209',
-          username: 'kaan',
-          displayName: 'Kaan',
-          avatar: DEFAULT_AVATARS[2],
-          bio: 'Drill & Beat maker 🎹',
-          lastTrack: {
-            title: 'ŞEHRİME BOMBALAR',
-            artist: 'Motive',
-            time: '14m ago',
-            playing: false,
-            cover: 'https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg'
-          }
-        },
-        {
-          id: 'u_deniz',
-          code: 'RS-883012',
-          username: 'deniz',
-          displayName: 'Deniz',
-          avatar: DEFAULT_AVATARS[0],
-          bio: 'Night walks & lo-fi beats 🌙',
-          lastTrack: {
-            title: 'pVg',
-            artist: 'Motive',
-            time: '1h ago',
-            playing: false,
-            cover: 'https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg'
-          }
-        }
-      ],
-      followersCount: 14,
+      following: [],
+      followersCount: 0,
       stats: {
-        totalPlays: 28,
-        totalDurationMinutes: 94,
-        topArtists: {
-          'Motive': 24,
-          'Uzi': 12,
-          'Batuflex': 8,
-          'Heijan': 5
-        },
-        topTracks: [
-          { title: 'YIN YANG', artist: 'Motive', plays: 14 },
-          { title: 'ŞEHRİME BOMBALAR', artist: 'Motive', plays: 9 },
-          { title: 'pVg', artist: 'Motive', plays: 5 }
-        ]
+        totalPlays: 0,
+        totalDurationMinutes: 0,
+        topArtists: {},
+        topTracks: []
       }
     };
   }
