@@ -27444,7 +27444,7 @@ function bindCoverHoldZoom(wrapEl) {
         item.className = 'reg-artist-item' + (selectedArtists.has(art.name) ? ' selected' : '');
         item.innerHTML = `
           <div class="reg-artist-avatar-wrap">
-            <img src="${escapeHtml(art.image || 'https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg')}" alt="${escapeHtml(art.name)}" loading="lazy">
+            <img src="${escapeHtml(art.image || 'https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg')}" alt="${escapeHtml(art.name)}" loading="lazy" onerror="this.onerror=null; this.src='https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent('${escapeHtml(art.name)}');">
             <div class="reg-artist-check">✓</div>
           </div>
           <span class="reg-artist-name">${escapeHtml(art.name)}</span>
@@ -27725,18 +27725,6 @@ function bindCoverHoldZoom(wrapEl) {
     });
 
     updateCloudStatusUI();
-
-    // First-run Spotify-like Account & Genre onboarding prompt
-    const ONBOARDING_PROMPTED_KEY = 'raser_account_onboard_prompted_v1';
-    if (!localStorage.getItem(ONBOARDING_PROMPTED_KEY)) {
-      setTimeout(() => {
-        const user = window.RaserFirebase ? window.RaserFirebase.getCurrentUser() : null;
-        if (!user) {
-          localStorage.setItem(ONBOARDING_PROMPTED_KEY, '1');
-          openFirebaseModal('register');
-        }
-      }, 1400);
-    }
 
     window.openTrackNoteModal = function(track) {
       if (!track || !window.RaserAccount) return;
