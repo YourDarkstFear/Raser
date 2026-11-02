@@ -137,8 +137,8 @@
           <span>Switch Account</span>
         </button>
         <button class="user-dropdown-item" id="btn-menu-firebase">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>
-          <span>Firebase Cloud Sync</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <span id="btn-menu-firebase-label">Raser Hesabı</span>
         </button>
         <div class="user-dropdown-divider"></div>
         <button class="user-dropdown-item" id="btn-menu-share-code">
@@ -585,7 +585,7 @@
             <div class="profile-handles">
               <span class="profile-username" id="profile-handle-display">@hamza</span>
               <span class="profile-code-pill" id="profile-code-display" title="Click to copy Raser Friend Code">RS-MOTIVE</span>
-              <span class="profile-cloud-badge" id="profile-cloud-badge" title="Firebase Cloud Status">⚪ Local</span>
+              <span class="profile-cloud-badge" id="profile-cloud-badge" title="Raser Hesap Durumu">⚪ Yerel Hesap</span>
             </div>
             <p class="profile-bio" id="profile-bio-display">Music enthusiast 🎧 | Hip-Hop & Rap lover</p>
             <div class="profile-genres-row" id="profile-genres-display">
@@ -606,7 +606,7 @@
           <div class="profile-actions-bar">
             <button class="btn-pill-primary" id="btn-profile-edit-modal">Edit Profile</button>
             <button class="btn-outline-pill" id="btn-profile-add-friend">+ Add Friend</button>
-            <button class="btn-outline-pill" id="btn-profile-cloud-sync" title="Firebase Cloud Sync">☁️ Cloud</button>
+            <button class="btn-outline-pill" id="btn-profile-cloud-sync" title="Raser Hesabı">👤 Raser Hesabı</button>
             <button class="btn-icon-pill" id="btn-profile-share-code" title="Copy Friend Code">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
             </button>
@@ -4075,51 +4075,94 @@
     </div>
   </div>
 
-  <!-- Modal: Firebase Cloud Connect -->
+  <!-- Modal: Raser Account & Auth -->
   <div class="dialog-scrim hidden" id="modal-firebase-connect">
-    <div class="dialog-box" style="max-width: 440px;">
+    <div class="dialog-box" style="max-width: 460px; max-height: 90vh; overflow-y: auto;">
       <div class="dialog-header">
-        <h3 class="dialog-title">Firebase Cloud Account</h3>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 28px; height: 28px; border-radius: 8px; background: var(--md-sys-color-primary); display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+          </div>
+          <h3 class="dialog-title" id="raser-account-modal-title">Raser Hesabı</h3>
+        </div>
         <button class="btn-icon-pill" id="btn-close-firebase-modal">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
 
-      <div class="profile-nav-tabs" style="margin-bottom: 16px;">
-        <button class="profile-tab-btn active" id="fb-tab-btn-auth">Sign In / Register</button>
-        <button class="profile-tab-btn" id="fb-tab-btn-config">Firebase Config</button>
-      </div>
-
-      <!-- Auth Tab -->
-      <div class="dialog-content" id="fb-pane-auth" style="display: flex; flex-direction: column; gap: 12px;">
-        <div id="firebase-logged-in-box" class="hidden" style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; background: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);">
-          <span style="font-size: 13px; font-weight: 700; color: var(--md-sys-color-primary);">Connected to Firebase Cloud!</span>
-          <span id="firebase-user-email" style="font-size: 12px; color: var(--md-sys-color-on-surface);">user@email.com</span>
-          <button type="button" class="btn-outline-pill" id="btn-firebase-logout" style="width: fit-content; height: 30px; font-size: 12px; margin-top: 4px;">Sign Out</button>
-        </div>
-
-        <div id="firebase-auth-form" style="display: flex; flex-direction: column; gap: 10px;">
-          <input type="email" id="fb-input-email" class="pill-text-input" placeholder="Email address" autocomplete="email">
-          <input type="password" id="fb-input-password" class="pill-text-input" placeholder="Password (min 6 characters)" autocomplete="current-password">
-          <div id="fb-auth-status" class="hidden" style="font-size: 12px; text-align: center;"></div>
-          <div style="display: flex; gap: 8px; margin-top: 6px;">
-            <button type="button" class="btn-pill-primary" id="btn-fb-signin" style="flex: 1;">Sign In</button>
-            <button type="button" class="btn-outline-pill" id="btn-fb-register" style="flex: 1;">Register</button>
+      <!-- Logged In Card -->
+      <div id="firebase-logged-in-box" class="hidden" style="display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 16px; background: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent); border: 1px solid color-mix(in srgb, var(--md-sys-color-primary) 24%, transparent);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <img id="raser-active-user-avatar" src="" style="width: 46px; height: 46px; border-radius: 50%; object-fit: cover;">
+          <div style="display: flex; flex-direction: column;">
+            <span id="raser-active-user-name" style="font-size: 15px; font-weight: 700; color: var(--md-sys-color-on-surface);">User</span>
+            <span id="firebase-user-email" style="font-size: 12px; color: var(--md-sys-color-outline);">user@email.com</span>
           </div>
         </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 15%, transparent);">
+          <span style="font-size: 12px; color: var(--md-sys-color-primary); font-weight: 600;">🟢 Hesabın Senkronize</span>
+          <button type="button" class="btn-outline-pill" id="btn-firebase-logout" style="height: 30px; font-size: 12px; padding: 0 14px;">Çıkış Yap</button>
+        </div>
       </div>
 
-      <!-- Config Tab -->
-      <div class="dialog-content hidden" id="fb-pane-config" style="display: flex; flex-direction: column; gap: 10px;">
-        <p style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin: 0;">
-          Paste your Firebase web project configuration (from Firebase Console -> Project Settings -> General -> Your apps -> SDK setup/config):
-        </p>
-        <textarea id="fb-input-config-json" class="pill-text-input" rows="5" style="border-radius: 12px; font-family: monospace; font-size: 11px; resize: none;" placeholder='{ "apiKey": "...", "projectId": "...", "authDomain": "..." }'></textarea>
-        <button type="button" class="btn-pill-primary" id="btn-fb-save-config">Save Firebase Config</button>
+      <!-- Auth Container (Giriş Yap / Kayıt Ol) -->
+      <div id="raser-auth-container" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="profile-nav-tabs" style="margin-bottom: 4px;">
+          <button class="profile-tab-btn active" id="fb-tab-btn-auth">Giriş Yap</button>
+          <button class="profile-tab-btn" id="fb-tab-btn-register">Hesap Oluştur</button>
+        </div>
+
+        <!-- Tab 1: Sign In -->
+        <div id="fb-pane-signin" style="display: flex; flex-direction: column; gap: 12px;">
+          <p style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin: 0;">Müziğini, çalma listelerini ve arkadaşlarını senkronize etmek için Raser hesabına giriş yap.</p>
+          <input type="email" id="fb-input-email" class="pill-text-input" placeholder="E-posta adresi" autocomplete="email">
+          <input type="password" id="fb-input-password" class="pill-text-input" placeholder="Şifre" autocomplete="current-password">
+          <button type="button" class="btn-pill-primary" id="btn-fb-signin" style="width: 100%; height: 42px; font-weight: 700;">Giriş Yap</button>
+        </div>
+
+        <!-- Tab 2: Register & Onboarding -->
+        <div id="fb-pane-register" class="hidden" style="display: flex; flex-direction: column; gap: 12px;">
+          <p style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin: 0;">Kendine özel bir profil oluştur, müzik zevkini belirle ve Raser dünyasına katıl.</p>
+          
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="reg-input-display-name" class="pill-text-input" placeholder="Görünen Adın (örn: Hamza)" style="flex: 1;">
+            <input type="text" id="reg-input-username" class="pill-text-input" placeholder="Kullanıcı Adı (örn: hamza)" style="flex: 1;">
+          </div>
+          <input type="email" id="reg-input-email" class="pill-text-input" placeholder="E-posta adresi" autocomplete="email">
+          <input type="password" id="reg-input-password" class="pill-text-input" placeholder="Şifre (en az 6 karakter)" autocomplete="new-password">
+
+          <!-- Genre Selection -->
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+            <span style="font-size: 12px; font-weight: 700; color: var(--md-sys-color-on-surface);">Sevdiğin Müzik Türleri:</span>
+            <div id="reg-genre-chips" style="display: flex; flex-wrap: wrap; gap: 6px;">
+              <span class="genre-selectable-chip active" data-genre="Hip-Hop">Hip-Hop</span>
+              <span class="genre-selectable-chip active" data-genre="Türkçe Rap">Türkçe Rap</span>
+              <span class="genre-selectable-chip active" data-genre="Trap">Trap</span>
+              <span class="genre-selectable-chip" data-genre="Drill">Drill</span>
+              <span class="genre-selectable-chip" data-genre="R&B">R&B</span>
+              <span class="genre-selectable-chip" data-genre="Pop">Pop</span>
+              <span class="genre-selectable-chip" data-genre="Rock">Rock</span>
+              <span class="genre-selectable-chip" data-genre="Elektronik">Elektronik</span>
+              <span class="genre-selectable-chip" data-genre="Lo-Fi">Lo-Fi</span>
+              <span class="genre-selectable-chip" data-genre="Akustik">Akustik</span>
+            </div>
+          </div>
+
+          <!-- Avatar Selection -->
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <span style="font-size: 12px; font-weight: 700; color: var(--md-sys-color-on-surface);">Profil Avatarı Seç:</span>
+            <div id="reg-avatar-choices" style="display: flex; gap: 10px; align-items: center;"></div>
+          </div>
+
+          <button type="button" class="btn-pill-primary" id="btn-fb-register" style="width: 100%; height: 42px; font-weight: 700; margin-top: 6px;">Kayıt Ol ve Başla</button>
+        </div>
+
+        <div id="fb-auth-status" class="hidden" style="font-size: 12px; text-align: center; padding: 4px 0;"></div>
       </div>
 
-      <div class="dialog-actions" style="margin-top: 16px;">
-        <button type="button" class="btn-outline-pill" id="btn-cancel-firebase-modal">Close</button>
+      <div class="dialog-actions" style="margin-top: 14px; display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn-text" id="btn-guest-mode" style="font-size: 12px; color: var(--md-sys-color-outline); cursor: pointer; text-decoration: underline;">Şimdilik Misafir Olarak Devam Et</button>
+        <button type="button" class="btn-outline-pill" id="btn-cancel-firebase-modal">Kapat</button>
       </div>
     </div>
   </div>

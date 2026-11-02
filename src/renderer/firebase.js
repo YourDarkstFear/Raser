@@ -7,14 +7,13 @@
   let activeUser = null;
   let presenceListenerUnsub = null;
 
-  // Default demo / placeholder config template
-  const DEFAULT_CONFIG_TEMPLATE = {
-    apiKey: '',
-    authDomain: '',
-    projectId: '',
-    storageBucket: '',
-    messagingSenderId: '',
-    appId: ''
+  const BUILTIN_FIREBASE_CONFIG = {
+    apiKey: "AIzaSyB_PeXk9AV8ABPjNT7WgZ7bQNjXsQwMIIw",
+    authDomain: "raser-3f545.firebaseapp.com",
+    projectId: "raser-3f545",
+    storageBucket: "raser-3f545.firebasestorage.app",
+    messagingSenderId: "565117653784",
+    appId: "1:565117653784:web:c86be8afbc24a0ae6b046d"
   };
 
   function getStoredConfig() {
@@ -22,7 +21,7 @@
       const raw = localStorage.getItem(STORAGE_KEY_FB_CONFIG);
       if (raw) return JSON.parse(raw);
     } catch (_) {}
-    return null;
+    return BUILTIN_FIREBASE_CONFIG;
   }
 
   function saveConfig(cfg) {
@@ -72,9 +71,9 @@
   }
 
   // Auth Functions
-  async function registerWithEmail(email, password, displayName = '', username = '') {
+  async function registerWithEmail(email, password, displayName = '', username = '', genres = null, avatar = null) {
     if (!isInitialized && !initFirebase()) {
-      return { success: false, message: 'Firebase is not configured yet. Please enter your Firebase config.' };
+      return { success: false, message: 'Could not connect to authentication services.' };
     }
     try {
       const cred = await firebase.auth().createUserWithEmailAndPassword(email, password);
@@ -92,8 +91,9 @@
         displayName: displayName || email.split('@')[0],
         username: (username || email.split('@')[0]).toLowerCase().replace(/[^a-z0-9_]/g, ''),
         code: code,
+        avatar: avatar || '',
         bio: 'Listening to music on Raser 🎵',
-        genres: ['Hip-Hop', 'Rap', 'Turkish Trap'],
+        genres: Array.isArray(genres) && genres.length > 0 ? genres : ['Hip-Hop', 'Rap', 'Turkish Trap'],
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         stats: { totalPlays: 0, totalDurationMinutes: 0, topArtists: {}, topTracks: [] }
       };
@@ -106,6 +106,8 @@
           displayName: profileData.displayName,
           username: profileData.username,
           code: profileData.code,
+          avatar: profileData.avatar || (window.RaserAccount.getActiveProfile() ? window.RaserAccount.getActiveProfile().avatar : ''),
+          genres: profileData.genres,
           firebaseUid: user.uid
         });
       }

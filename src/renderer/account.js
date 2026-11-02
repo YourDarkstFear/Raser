@@ -276,6 +276,32 @@
     return { success: true, friend: newFriend };
   }
 
+  function addFriendDirectly(friendObj) {
+    const profile = getActiveProfile();
+    if (!profile || !friendObj) return { success: false, message: 'Invalid friend data' };
+    profile.following = profile.following || [];
+    if (profile.following.some(f => (friendObj.code && f.code === friendObj.code) || (friendObj.id && f.id === friendObj.id))) {
+      return { success: false, message: 'Already following this user!' };
+    }
+    const newFriend = {
+      id: friendObj.id || friendObj.uid || 'f_' + Math.random().toString(36).substring(2, 8),
+      code: friendObj.code || 'RS-USER',
+      username: friendObj.username || 'user',
+      displayName: friendObj.displayName || 'Music Friend',
+      avatar: friendObj.avatar || DEFAULT_AVATARS[0],
+      bio: friendObj.bio || '',
+      lastTrack: friendObj.lastTrack || {
+        title: 'Exploring music',
+        artist: 'Raser',
+        time: 'Online',
+        playing: false
+      }
+    };
+    profile.following.unshift(newFriend);
+    updateActiveProfile({ following: profile.following });
+    return { success: true, friend: newFriend };
+  }
+
   function unfollowFriend(friendId) {
     const profile = getActiveProfile();
     if (!profile || !profile.following) return;
@@ -325,6 +351,7 @@
     createNewProfile,
     recordTrackPlay,
     addFriendByCode,
+    addFriendDirectly,
     unfollowFriend,
     getTrackNotes,
     setTrackNote,

@@ -11671,3 +11671,31 @@ body.perf .np-queue-panel { transition: none; }
 }
 
 .sh-title .verified-check { margin-left: 0; }
+
+/* Genre Selectable Chips for Onboarding & Profile */
+.genre-selectable-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 18%, transparent);
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  user-select: none;
+}
+.genre-selectable-chip:hover {
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  transform: translateY(-1px);
+}
+.genre-selectable-chip.active {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 22%, transparent);
+  color: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
+  font-weight: 700;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--md-sys-color-primary) 30%, transparent);
+}

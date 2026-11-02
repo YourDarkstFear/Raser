@@ -8528,6 +8528,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           navigator.mediaSession.playbackState = state.isPlaying ? 'playing' : 'paused';
         }
         sendDiscordRpcUpdate(null, false);
+        try {
+          if (window.RaserFirebase && state.currentTrack) {
+            window.RaserFirebase.broadcastListeningTrack(state.currentTrack, false);
+          }
+        } catch (_) {}
         sendStateToServer();
         updateMediaSession();
       }
@@ -27278,10 +27283,31 @@ function bindCoverHoldZoom(wrapEl) {
     if (btnCloseAddFriend) btnCloseAddFriend.addEventListener('click', () => closeModal(modalAddFriend));
     if (btnCancelAddFriend) btnCancelAddFriend.addEventListener('click', () => closeModal(modalAddFriend));
     if (btnSubmitAddFriend) {
-      btnSubmitAddFriend.addEventListener('click', () => {
+      btnSubmitAddFriend.addEventListener('click', async () => {
         const code = inputFriendCode.value.trim();
         if (!code) return;
-        const res = window.RaserAccount.addFriendByCode(code);
+
+        let res = null;
+        if (window.RaserFirebase && window.RaserFirebase.isConfigured() && code.toUpperCase().startsWith('RS-')) {
+          try {
+            const cloudUser = await window.RaserFirebase.findUserByRaserCode(code);
+            if (cloudUser) {
+              res = window.RaserAccount.addFriendDirectly({
+                id: cloudUser.uid,
+                code: cloudUser.code,
+                username: cloudUser.username,
+                displayName: cloudUser.displayName,
+                avatar: cloudUser.avatar,
+                bio: cloudUser.bio
+              });
+            }
+          } catch (_) {}
+        }
+
+        if (!res) {
+          res = window.RaserAccount.addFriendByCode(code);
+        }
+
         if (res.success) {
           closeModal(modalAddFriend);
           showToast(`Now following ${res.friend.displayName}!`);
@@ -27342,6 +27368,267 @@ function bindCoverHoldZoom(wrapEl) {
           showToast('Created new profile: ' + np.displayName);
         }
       });
+    }
+
+    // Modal: Raser Account & Auth
+    const modalFirebase = document.getElementById('modal-firebase-connect');
+    const btnCloseFirebaseModal = document.getElementById('btn-close-firebase-modal');
+    const btnCancelFirebaseModal = document.getElementById('btn-cancel-firebase-modal');
+    const btnMenuFirebase = document.getElementById('btn-menu-firebase');
+    const btnProfileCloudSync = document.getElementById('btn-profile-cloud-sync');
+    const btnGuestMode = document.getElementById('btn-guest-mode');
+
+    const fbTabBtnAuth = document.getElementById('fb-tab-btn-auth');
+    const fbTabBtnRegister = document.getElementById('fb-tab-btn-register');
+    const fbPaneSignin = document.getElementById('fb-pane-signin');
+    const fbPaneRegister = document.getElementById('fb-pane-register');
+    const raserAuthContainer = document.getElementById('raser-auth-container');
+
+    const fbLoggedInBox = document.getElementById('firebase-logged-in-box');
+    const fbUserEmail = document.getElementById('firebase-user-email');
+    const raserActiveUserAvatar = document.getElementById('raser-active-user-avatar');
+    const raserActiveUserName = document.getElementById('raser-active-user-name');
+    const btnFbLogout = document.getElementById('btn-firebase-logout');
+
+    const inputFbEmail = document.getElementById('fb-input-email');
+    const inputFbPassword = document.getElementById('fb-input-password');
+    const btnFbSignin = document.getElementById('btn-fb-signin');
+
+    const regInputDisplayName = document.getElementById('reg-input-display-name');
+    const regInputUsername = document.getElementById('reg-input-username');
+    const regInputEmail = document.getElementById('reg-input-email');
+    const regInputPassword = document.getElementById('reg-input-password');
+    const regGenreChips = document.getElementById('reg-genre-chips');
+    const regAvatarChoices = document.getElementById('reg-avatar-choices');
+    const btnFbRegister = document.getElementById('btn-fb-register');
+    const fbAuthStatus = document.getElementById('fb-auth-status');
+
+    let regSelectedAvatar = window.RaserAccount.DEFAULT_AVATARS[0];
+
+    function setupGenreChips() {
+      if (!regGenreChips) return;
+      const chips = regGenreChips.querySelectorAll('.genre-selectable-chip');
+      chips.forEach(chip => {
+        chip.onclick = () => {
+          chip.classList.toggle('active');
+        };
+      });
+    }
+
+    function setupAvatarChoices() {
+      if (!regAvatarChoices) return;
+      regAvatarChoices.innerHTML = '';
+      window.RaserAccount.DEFAULT_AVATARS.forEach(av => {
+        const img = document.createElement('img');
+        img.src = av;
+        img.style.cssText = 'width: 36px; height: 36px; border-radius: 50%; cursor: pointer; border: 2px solid ' + (av === regSelectedAvatar ? 'var(--md-sys-color-primary)' : 'transparent') + '; transition: transform 0.2s ease;';
+        img.onclick = () => {
+          regSelectedAvatar = av;
+          Array.from(regAvatarChoices.children).forEach(c => c.style.borderColor = 'transparent');
+          img.style.borderColor = 'var(--md-sys-color-primary)';
+        };
+        regAvatarChoices.appendChild(img);
+      });
+    }
+
+    setupGenreChips();
+    setupAvatarChoices();
+
+    function updateCloudStatusUI() {
+      const profileCloudBadge = document.getElementById('profile-cloud-badge');
+      const menuLabel = document.getElementById('btn-menu-firebase-label');
+      const user = window.RaserFirebase ? window.RaserFirebase.getCurrentUser() : null;
+
+      if (user) {
+        if (profileCloudBadge) {
+          profileCloudBadge.textContent = '🟢 Senkronize';
+          profileCloudBadge.classList.add('connected');
+          profileCloudBadge.title = 'Raser Hesabın bağlı: ' + (user.email || user.displayName || 'Aktif');
+        }
+        if (menuLabel) menuLabel.textContent = 'Hesap: ' + (user.displayName || user.email ? (user.displayName || user.email.split('@')[0]) : 'Profil');
+      } else {
+        if (profileCloudBadge) {
+          profileCloudBadge.textContent = '⚪ Yerel Profil';
+          profileCloudBadge.classList.remove('connected');
+          profileCloudBadge.title = 'Giriş yaparak müziklerini ve arkadaşlarını senkronize et';
+        }
+        if (menuLabel) menuLabel.textContent = 'Raser Hesabı';
+      }
+    }
+
+    function openFirebaseModal(defaultTab = 'signin') {
+      if (!modalFirebase) return;
+      if (typeof closeDropdown === 'function') closeDropdown();
+
+      const user = window.RaserFirebase ? window.RaserFirebase.getCurrentUser() : null;
+      const profile = window.RaserAccount ? window.RaserAccount.getActiveProfile() : null;
+
+      if (user) {
+        if (fbLoggedInBox) fbLoggedInBox.classList.remove('hidden');
+        if (raserAuthContainer) raserAuthContainer.classList.add('hidden');
+        if (fbUserEmail) fbUserEmail.textContent = user.email || user.uid;
+        if (raserActiveUserName) raserActiveUserName.textContent = profile ? (profile.displayName || profile.username) : (user.displayName || 'Raser Kullanıcısı');
+        if (raserActiveUserAvatar) raserActiveUserAvatar.src = profile && profile.avatar ? profile.avatar : window.RaserAccount.DEFAULT_AVATARS[0];
+      } else {
+        if (fbLoggedInBox) fbLoggedInBox.classList.add('hidden');
+        if (raserAuthContainer) raserAuthContainer.classList.remove('hidden');
+
+        if (defaultTab === 'register' && fbTabBtnRegister) {
+          fbTabBtnRegister.click();
+        } else if (fbTabBtnAuth) {
+          fbTabBtnAuth.click();
+        }
+      }
+
+      if (fbAuthStatus) {
+        fbAuthStatus.classList.add('hidden');
+        fbAuthStatus.textContent = '';
+      }
+
+      openModal(modalFirebase);
+    }
+
+    if (btnMenuFirebase) btnMenuFirebase.addEventListener('click', () => openFirebaseModal('signin'));
+    if (btnProfileCloudSync) btnProfileCloudSync.addEventListener('click', () => openFirebaseModal('signin'));
+    const profileCloudBadgeEl = document.getElementById('profile-cloud-badge');
+    if (profileCloudBadgeEl) profileCloudBadgeEl.addEventListener('click', () => openFirebaseModal('signin'));
+
+    if (btnCloseFirebaseModal) btnCloseFirebaseModal.addEventListener('click', () => closeModal(modalFirebase));
+    if (btnCancelFirebaseModal) btnCancelFirebaseModal.addEventListener('click', () => closeModal(modalFirebase));
+    if (btnGuestMode) {
+      btnGuestMode.addEventListener('click', () => {
+        closeModal(modalFirebase);
+        showToast('Misafir modundasın. Dilediğin zaman Raser Hesabı açabilirsin.');
+      });
+    }
+
+    if (fbTabBtnAuth && fbTabBtnRegister) {
+      fbTabBtnAuth.addEventListener('click', () => {
+        fbTabBtnAuth.classList.add('active');
+        fbTabBtnRegister.classList.remove('active');
+        if (fbPaneSignin) fbPaneSignin.classList.remove('hidden');
+        if (fbPaneRegister) fbPaneRegister.classList.add('hidden');
+        if (fbAuthStatus) fbAuthStatus.classList.add('hidden');
+      });
+      fbTabBtnRegister.addEventListener('click', () => {
+        fbTabBtnRegister.classList.add('active');
+        fbTabBtnAuth.classList.remove('active');
+        if (fbPaneRegister) fbPaneRegister.classList.remove('hidden');
+        if (fbPaneSignin) fbPaneSignin.classList.add('hidden');
+        if (fbAuthStatus) fbAuthStatus.classList.add('hidden');
+      });
+    }
+
+    if (btnFbSignin) {
+      btnFbSignin.addEventListener('click', async () => {
+        const email = inputFbEmail ? inputFbEmail.value.trim() : '';
+        const pass = inputFbPassword ? inputFbPassword.value : '';
+        if (!email || !pass) {
+          if (fbAuthStatus) {
+            fbAuthStatus.classList.remove('hidden');
+            fbAuthStatus.style.color = '#ff6b6b';
+            fbAuthStatus.textContent = 'Lütfen e-posta ve şifreni gir.';
+          }
+          return;
+        }
+        btnFbSignin.disabled = true;
+        btnFbSignin.textContent = 'Giriş yapılıyor...';
+        const res = await window.RaserFirebase.loginWithEmail(email, pass);
+        btnFbSignin.disabled = false;
+        btnFbSignin.textContent = 'Giriş Yap';
+
+        if (res.success) {
+          showToast('Raser hesabına hoş geldin!');
+          closeModal(modalFirebase);
+          updateCloudStatusUI();
+          if (state.currentView === 'profile') renderProfileView();
+        } else {
+          if (fbAuthStatus) {
+            fbAuthStatus.classList.remove('hidden');
+            fbAuthStatus.style.color = '#ff6b6b';
+            fbAuthStatus.textContent = res.message || 'Giriş yapılamadı.';
+          }
+        }
+      });
+    }
+
+    if (btnFbRegister) {
+      btnFbRegister.addEventListener('click', async () => {
+        const dName = regInputDisplayName ? regInputDisplayName.value.trim() : '';
+        const uName = regInputUsername ? regInputUsername.value.trim() : '';
+        const email = regInputEmail ? regInputEmail.value.trim() : '';
+        const pass = regInputPassword ? regInputPassword.value : '';
+
+        if (!email || !pass || pass.length < 6) {
+          if (fbAuthStatus) {
+            fbAuthStatus.classList.remove('hidden');
+            fbAuthStatus.style.color = '#ff6b6b';
+            fbAuthStatus.textContent = 'Lütfen geçerli bir e-posta ve en az 6 haneli şifre girin.';
+          }
+          return;
+        }
+
+        const selectedGenres = [];
+        if (regGenreChips) {
+          regGenreChips.querySelectorAll('.genre-selectable-chip.active').forEach(c => {
+            selectedGenres.push(c.dataset.genre);
+          });
+        }
+
+        btnFbRegister.disabled = true;
+        btnFbRegister.textContent = 'Hesap oluşturuluyor...';
+        const res = await window.RaserFirebase.registerWithEmail(email, pass, dName || 'Müziksever', uName || 'user', selectedGenres, regSelectedAvatar);
+        btnFbRegister.disabled = false;
+        btnFbRegister.textContent = 'Kayıt Ol ve Başla';
+
+        if (res.success) {
+          showToast('Raser hesabın oluşturuldu! Keyifli dinlemeler.');
+          closeModal(modalFirebase);
+          updateCloudStatusUI();
+          if (state.currentView === 'profile') renderProfileView();
+        } else {
+          if (fbAuthStatus) {
+            fbAuthStatus.classList.remove('hidden');
+            fbAuthStatus.style.color = '#ff6b6b';
+            fbAuthStatus.textContent = res.message || 'Kayıt işlemi başarısız oldu.';
+          }
+        }
+      });
+    }
+
+    if (btnFbLogout) {
+      btnFbLogout.addEventListener('click', async () => {
+        if (window.RaserFirebase) await window.RaserFirebase.logout();
+        showToast('Oturum kapatıldı.');
+        closeModal(modalFirebase);
+        updateCloudStatusUI();
+        if (state.currentView === 'profile') renderProfileView();
+      });
+    }
+
+    window.addEventListener('raser:firebase-auth-changed', () => {
+      updateCloudStatusUI();
+      if (state.currentView === 'profile') renderProfileView();
+    });
+
+    window.addEventListener('raser:user-playing', (e) => {
+      if (window.RaserFirebase && e.detail) {
+        window.RaserFirebase.broadcastListeningTrack(e.detail, true);
+      }
+    });
+
+    updateCloudStatusUI();
+
+    // First-run Spotify-like Account & Genre onboarding prompt
+    const ONBOARDING_PROMPTED_KEY = 'raser_account_onboard_prompted_v1';
+    if (!localStorage.getItem(ONBOARDING_PROMPTED_KEY)) {
+      setTimeout(() => {
+        const user = window.RaserFirebase ? window.RaserFirebase.getCurrentUser() : null;
+        if (!user) {
+          localStorage.setItem(ONBOARDING_PROMPTED_KEY, '1');
+          openFirebaseModal('register');
+        }
+      }, 1400);
     }
 
     window.openTrackNoteModal = function(track) {
@@ -27446,6 +27733,11 @@ function bindCoverHoldZoom(wrapEl) {
     if (!window.RaserAccount) return;
     const profile = window.RaserAccount.getActiveProfile();
     if (!profile) return;
+
+    if (typeof updateCloudStatusUI === 'function') updateCloudStatusUI();
+    if (window.RaserFirebase && window.RaserFirebase.getCurrentUser()) {
+      window.RaserFirebase.syncProfileToCloud(profile);
+    }
 
     // Hero
     const avImg = document.getElementById('profile-avatar-display');
