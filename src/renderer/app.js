@@ -1987,6 +1987,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                           navLocal: document.getElementById('nav-local'),
                           navHistory: document.getElementById('nav-history'),
                           navQueue: document.getElementById('nav-queue'),
+                          navProfile: document.getElementById('nav-profile'),
                           navSettings: document.getElementById('nav-settings'),
                           favoritesCount: document.getElementById('favorites-count'),
                           albumsCount: document.getElementById('albums-count'),
@@ -2010,6 +2011,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                           btnNewPlaylist: document.getElementById('btn-new-playlist'),
 
                           viewDiscover: document.getElementById('view-discover'),
+                          viewProfile: document.getElementById('view-profile'),
                           viewFavorites: document.getElementById('view-favorites'),
                           viewAlbums: document.getElementById('view-albums'),
                           savedAlbumsGrid: document.getElementById('saved-albums-grid'),
@@ -4465,6 +4467,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyTrackRenames(track);
     if (typeof queueList === "number") { startIndex = queueList; queueList = state.queue; }
     if (!track || !el.nativeAudio) return;
+    try {
+      if (window.RaserAccount && track) window.RaserAccount.recordTrackPlay(track);
+    } catch (_) {}
     const selectedQuality = localStorage.getItem('riff_audio_quality') || 'medium';
     if (track._preloadedStreamQuality && track._preloadedStreamQuality !== selectedQuality) {
       delete track._preloadedStreamUrl;
@@ -9055,23 +9060,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isExact = (normA === normQ);
         const isClose = (normA.startsWith(normQ) || normQ.startsWith(normA)) && Math.abs(normA.length - normQ.length) <= 3;
         if (!isExact && !isClose) return;
-        if (Array.isArray(searchTracks) && searchTracks.length > 0) {
-          const topTrackTitle = normalizeImportText(searchTracks[0].title || '');
-          if (topTrackTitle === normQ && normA !== normQ) return;
-        }
       }
 
       const avatarUrl = artist.avatar || (searchTracks && searchTracks[0] ? searchTracks[0].thumbnail : '');
       const fans = artist.fans || artist.nb_fan || 0;
-      const label = fans > 0 ? `Artist \u2022 ${fans.toLocaleString()} listeners` : 'Artist';
+      const label = fans > 0 ? `${fans.toLocaleString()} listeners` : 'Artist';
+
       container.innerHTML = `
-        <div class="search-artist-card" role="button" tabindex="0">
-          <div class="search-artist-avatar-wrap">
-            ${avatarUrl ? `<img class="search-artist-avatar" src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(artist.name)}" />` : '<div style=\"width:100%;height:100%;background:var(--md-sys-color-surface-container);\"></div>'}
+        <div class="search-top-result-card" role="button" tabindex="0">
+          <div class="search-top-result-avatar-wrap">
+            ${avatarUrl ? `<img class="search-top-result-avatar" src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(artist.name)}" />` : '<div class="search-top-result-avatar-fallback"></div>'}
+            <button class="top-result-play-btn" title="Play ${escapeHtml(artist.name)}" aria-label="Play ${escapeHtml(artist.name)}">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>
+            </button>
           </div>
-          <div class="search-artist-info">
-            <span class="search-artist-name">${escapeHtml(artist.name)}${artist.isVerified ? VERIFIED_CHECK_SVG : ''}</span>
-            <span class="search-artist-label">${escapeHtml(label)}</span>
+          <div class="search-top-result-info">
+            <div class="search-badge-pill">ARTIST</div>
+            <h2 class="search-top-result-name">${escapeHtml(artist.name)}${artist.isVerified ? VERIFIED_CHECK_SVG : ''}</h2>
+            <div class="search-top-result-meta">
+              <span class="search-top-result-label">${escapeHtml(label)}</span>
+            </div>
           </div>
         </div>
       `;
@@ -9080,9 +9088,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         recordSearchArtist(artist.name, avatarUrl, artist.isVerified);
         openArtistProfile(artist.name);
       };
-      const card = container.querySelector('.search-artist-card');
+      const card = container.querySelector('.search-top-result-card');
       if (card) {
-        card.addEventListener('click', open);
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.top-result-play-btn')) return;
+          open();
+        });
         card.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
@@ -9090,6 +9101,24 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         });
       }
+
+      const playBtn = container.querySelector('.top-result-play-btn');
+      if (playBtn) {
+        playBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (Array.isArray(searchTracks) && searchTracks.length > 0) {
+            const artistTracks = searchTracks.filter(t => {
+              const a = normalizeMatchText(t.artist);
+              return a.includes(normA) || normA.includes(a);
+            });
+            const tracksToPlay = artistTracks.length ? artistTracks : searchTracks;
+            playTrack(tracksToPlay[0], 0, tracksToPlay, 'search');
+          } else {
+            open();
+          }
+        });
+      }
+
       if (typeof applySearchFilter === 'function') applySearchFilter(currentSearchFilter);
     } catch (e) {}
   }
@@ -9972,15 +10001,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!Array.isArray(tracks) || tracks.length < 2) return tracks;
     const q = normalizeMatchText(stripFeaturing(query));
     if (!q) return tracks;
-    const exact = [];
+
+    const artistMatches = [];
+    const exactTitleMatches = [];
     const rest = [];
+
     tracks.forEach(t => {
       const title = normalizeMatchText(stripFeaturing(t.title));
       const artist = normalizeMatchText(t.artist);
-      const hit = title === q || (artist && (q === artist + ' ' + title || q === title + ' ' + artist));
-      (hit ? exact : rest).push(t);
+      const isArtistExact = artist === q || (artist && artist.split(' ').includes(q));
+      const isTitleExact = title === q;
+      const isCombinedHit = artist && (q === artist + ' ' + title || q === title + ' ' + artist);
+
+      if (isArtistExact) {
+        artistMatches.push(t);
+      } else if (isTitleExact || isCombinedHit) {
+        exactTitleMatches.push(t);
+      } else {
+        rest.push(t);
+      }
     });
-    return exact.length ? exact.concat(rest) : tracks;
+
+    if (artistMatches.length >= 1) {
+      return artistMatches.concat(exactTitleMatches).concat(rest);
+    }
+    return exactTitleMatches.length ? exactTitleMatches.concat(rest) : tracks;
   }
 
   function getSearchHistory() {
@@ -11134,6 +11179,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       </button>` : `
       <button class="btn-icon-pill btn-row-more" title="download & options">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle><circle cx="5" cy="12" r="2"></circle></svg>
+      </button>
+      <button class="btn-icon-pill btn-row-note" title="Song Memory / Note" aria-label="Song Memory">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
       </button>`}
       ${context === 'playlist' ? `
         <button class="btn-icon-pill btn-row-remove-playlist delete-btn btn-delete btn-remove" title="remove from playlist">
@@ -11282,6 +11330,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           btnMore.addEventListener('click', (e) => {
             e.stopPropagation();
             openDownloadModal(track);
+          });
+        }
+
+        const btnNote = row.querySelector('.btn-row-note');
+        if (btnNote) {
+          btnNote.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof window.openTrackNoteModal === 'function') {
+              window.openTrackNoteModal(track);
+            }
           });
         }
 
@@ -13684,13 +13742,13 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
 
     requestAnimationFrame(() => {
       document.querySelectorAll('.no-enter-anim').forEach(c => c.classList.remove('no-enter-anim'));
-      [el.viewDiscover, el.viewFavorites, el.viewAlbums, el.viewLocal, el.viewHistory, el.viewQueue, el.viewPlaylistDetail, el.viewAlbum, el.viewArtist, el.viewSettings].forEach(v => {
+      [el.viewDiscover, el.viewProfile, el.viewFavorites, el.viewAlbums, el.viewLocal, el.viewHistory, el.viewQueue, el.viewPlaylistDetail, el.viewAlbum, el.viewArtist, el.viewSettings].forEach(v => {
         if (v) v.classList.remove('active');
       });
 
         const nestedView = viewName === 'playlist-detail' || viewName === 'album' || viewName === 'artist';
         if (!nestedView) {
-          [el.navDiscover, el.navFavorites, el.navAlbums, el.navLocal, el.navHistory, el.navQueue, el.navSettings].forEach(n => {
+          [el.navDiscover, el.navProfile, el.navFavorites, el.navAlbums, el.navLocal, el.navHistory, el.navQueue, el.navSettings].forEach(n => {
             if (n) n.classList.remove('active');
           });
         }
@@ -13701,6 +13759,10 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
             if (el.navDiscover) el.navDiscover.classList.add('active');
             const sp = (localStorage.getItem('riff_home_layout') || 'spotify') === 'spotify';
             if (sp) renderSpotifyHome();
+          } else if (viewName === 'profile') {
+            if (el.viewProfile) el.viewProfile.classList.add('active');
+            if (el.navProfile) el.navProfile.classList.add('active');
+            if (typeof renderProfileView === 'function') renderProfileView();
           } else if (viewName === 'favorites') {
             if (el.viewFavorites) el.viewFavorites.classList.add('active');
             if (el.navFavorites) el.navFavorites.classList.add('active');
@@ -26949,6 +27011,629 @@ function bindCoverHoldZoom(wrapEl) {
       heroBanner.style.setProperty('--py', 0);
     });
   }
+
+  /* ==========================================================================
+     SPOTIFY-QUALITY USER PROFILE, SOCIAL & FRIEND ACTIVITY LOGIC
+     ========================================================================== */
+  function initAccountAndSocialSystem() {
+    if (!window.RaserAccount) return;
+
+    const userProfilePill = document.getElementById('user-profile-pill');
+    const userProfileDropdown = document.getElementById('user-profile-dropdown');
+    const btnToggleFriendActivity = document.getElementById('btn-toggle-friend-activity');
+    const navProfile = document.getElementById('nav-profile');
+
+    function updateTopNavUI() {
+      const profile = window.RaserAccount.getActiveProfile();
+      if (!profile) return;
+      const pillAvatar = document.getElementById('user-pill-avatar');
+      const pillName = document.getElementById('user-pill-name');
+      const ddAvatar = document.getElementById('dropdown-user-avatar');
+      const ddName = document.getElementById('dropdown-user-name');
+      const ddHandle = document.getElementById('dropdown-user-handle');
+      const ddCode = document.getElementById('dropdown-user-code');
+
+      if (pillAvatar) pillAvatar.src = profile.avatar || window.RaserAccount.DEFAULT_AVATARS[0];
+      if (pillName) pillName.textContent = profile.displayName || profile.username || 'User';
+      if (ddAvatar) ddAvatar.src = profile.avatar || window.RaserAccount.DEFAULT_AVATARS[0];
+      if (ddName) ddName.textContent = profile.displayName || 'User';
+      if (ddHandle) ddHandle.textContent = '@' + (profile.username || 'user');
+      if (ddCode) ddCode.textContent = profile.code || 'RS-MOTIVE';
+    }
+
+    updateTopNavUI();
+    window.addEventListener('raser:account-updated', updateTopNavUI);
+    window.addEventListener('raser:account-switched', () => {
+      updateTopNavUI();
+      if (state.currentView === 'profile') renderProfileView();
+      renderFriendSideActivity();
+    });
+
+    if (userProfilePill && userProfileDropdown) {
+      userProfilePill.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = !userProfileDropdown.classList.contains('hidden');
+        if (isOpen) {
+          userProfileDropdown.classList.add('hidden');
+          userProfilePill.classList.remove('open');
+        } else {
+          userProfileDropdown.classList.remove('hidden');
+          userProfilePill.classList.add('open');
+        }
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!userProfileDropdown.contains(e.target) && !userProfilePill.contains(e.target)) {
+          userProfileDropdown.classList.add('hidden');
+          userProfilePill.classList.remove('open');
+        }
+      });
+    }
+
+    const closeDropdown = () => {
+      if (userProfileDropdown) userProfileDropdown.classList.add('hidden');
+      if (userProfilePill) userProfilePill.classList.remove('open');
+    };
+
+    const btnMenuProfile = document.getElementById('btn-menu-profile');
+    if (btnMenuProfile) {
+      btnMenuProfile.addEventListener('click', () => {
+        closeDropdown();
+        switchView('profile');
+      });
+    }
+
+    if (navProfile) {
+      navProfile.addEventListener('click', () => {
+        switchView('profile');
+      });
+    }
+
+    const btnMenuFriends = document.getElementById('btn-menu-friends');
+    if (btnMenuFriends) {
+      btnMenuFriends.addEventListener('click', () => {
+        closeDropdown();
+        openFriendActivitySide();
+      });
+    }
+
+    if (btnToggleFriendActivity) {
+      btnToggleFriendActivity.addEventListener('click', () => {
+        openFriendActivitySide();
+      });
+    }
+
+    const btnMenuEditProfile = document.getElementById('btn-menu-edit-profile');
+    if (btnMenuEditProfile) {
+      btnMenuEditProfile.addEventListener('click', () => {
+        closeDropdown();
+        openEditProfileModal();
+      });
+    }
+
+    const btnMenuSwitchProfile = document.getElementById('btn-menu-switch-profile');
+    if (btnMenuSwitchProfile) {
+      btnMenuSwitchProfile.addEventListener('click', () => {
+        closeDropdown();
+        openSwitchProfileModal();
+      });
+    }
+
+    const copyCodeAction = () => {
+      const p = window.RaserAccount.getActiveProfile();
+      if (p && p.code) {
+        navigator.clipboard.writeText(p.code);
+        showToast('Raser Friend Code copied: ' + p.code);
+      }
+      closeDropdown();
+    };
+
+    const btnMenuShareCode = document.getElementById('btn-menu-share-code');
+    if (btnMenuShareCode) btnMenuShareCode.addEventListener('click', copyCodeAction);
+    const ddUserCode = document.getElementById('dropdown-user-code');
+    if (ddUserCode) ddUserCode.addEventListener('click', copyCodeAction);
+    const heroCodePill = document.getElementById('profile-code-display');
+    if (heroCodePill) heroCodePill.addEventListener('click', copyCodeAction);
+    const btnHeroShareCode = document.getElementById('btn-profile-share-code');
+    if (btnHeroShareCode) btnHeroShareCode.addEventListener('click', copyCodeAction);
+
+    // Profile View Actions
+    const btnHeroEditModal = document.getElementById('btn-profile-edit-modal');
+    if (btnHeroEditModal) btnHeroEditModal.addEventListener('click', openEditProfileModal);
+    const btnHeroAvatarEdit = document.getElementById('btn-edit-profile-avatar');
+    if (btnHeroAvatarEdit) btnHeroAvatarEdit.addEventListener('click', openEditProfileModal);
+
+    const btnHeroAddFriend = document.getElementById('btn-profile-add-friend');
+    if (btnHeroAddFriend) btnHeroAddFriend.addEventListener('click', openAddFriendModal);
+    const btnPaneAddFriend = document.getElementById('btn-pane-add-friend');
+    if (btnPaneAddFriend) btnPaneAddFriend.addEventListener('click', openAddFriendModal);
+    const btnSideAddFriend = document.getElementById('btn-side-add-friend');
+    if (btnSideAddFriend) btnSideAddFriend.addEventListener('click', openAddFriendModal);
+
+    // Profile Tabs
+    const profileTabBtns = document.querySelectorAll('.profile-tab-btn');
+    profileTabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        profileTabBtns.forEach(b => b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.profile-pane').forEach(p => {
+          p.classList.toggle('hidden', p.id !== 'pane-profile-' + tab);
+          p.classList.toggle('active', p.id === 'pane-profile-' + tab);
+        });
+      });
+    });
+
+    // Right Panel Tabs
+    const tabLyricsView = document.getElementById('tab-lyrics-view');
+    const tabFriendsView = document.getElementById('tab-friends-view');
+    const rightPanelArtBox = document.getElementById('right-panel-artwork-box');
+    const rightPanelLyricsSec = document.querySelector('#right-panel .lyrics-section');
+    const rightPanelFriendsCon = document.getElementById('right-panel-friends-container');
+
+    function switchRightPanelTab(tabName) {
+      if (tabLyricsView) tabLyricsView.classList.toggle('active', tabName === 'lyrics');
+      if (tabFriendsView) tabFriendsView.classList.toggle('active', tabName === 'friends');
+
+      if (tabName === 'friends') {
+        if (rightPanelArtBox) rightPanelArtBox.classList.add('hidden');
+        if (rightPanelLyricsSec) rightPanelLyricsSec.classList.add('hidden');
+        if (rightPanelFriendsCon) rightPanelFriendsCon.classList.remove('hidden');
+        renderFriendSideActivity();
+      } else {
+        if (rightPanelArtBox) rightPanelArtBox.classList.remove('hidden');
+        if (rightPanelLyricsSec) rightPanelLyricsSec.classList.remove('hidden');
+        if (rightPanelFriendsCon) rightPanelFriendsCon.classList.add('hidden');
+      }
+    }
+
+    if (tabLyricsView) tabLyricsView.addEventListener('click', () => switchRightPanelTab('lyrics'));
+    if (tabFriendsView) tabFriendsView.addEventListener('click', () => switchRightPanelTab('friends'));
+
+    function openFriendActivitySide() {
+      const rightPanel = document.getElementById('right-panel');
+      if (rightPanel) {
+        rightPanel.classList.remove('is-collapsed');
+        rightPanel.classList.remove('hidden');
+      }
+      switchRightPanelTab('friends');
+    }
+
+    // Modal: Edit Profile
+    const modalEditProfile = document.getElementById('modal-edit-profile');
+    const btnCloseEditProfile = document.getElementById('btn-close-edit-profile-modal');
+    const btnCancelEditProfile = document.getElementById('btn-cancel-edit-profile');
+    const btnSaveEditProfile = document.getElementById('btn-save-edit-profile');
+    let selectedAvatar = '';
+
+    function openEditProfileModal() {
+      const p = window.RaserAccount.getActiveProfile();
+      if (!p || !modalEditProfile) return;
+      document.getElementById('edit-profile-name').value = p.displayName || '';
+      document.getElementById('edit-profile-username').value = p.username || '';
+      document.getElementById('edit-profile-bio').value = p.bio || '';
+      document.getElementById('edit-profile-genres').value = (p.genres || []).join(', ');
+      selectedAvatar = p.avatar || window.RaserAccount.DEFAULT_AVATARS[0];
+      document.getElementById('edit-profile-avatar-preview').src = selectedAvatar;
+
+      const choicesBox = document.getElementById('avatar-choices-container');
+      if (choicesBox) {
+        choicesBox.innerHTML = '';
+        window.RaserAccount.DEFAULT_AVATARS.forEach((av, idx) => {
+          const item = document.createElement('img');
+          item.src = av;
+          item.style.cssText = 'width: 34px; height: 34px; border-radius: 50%; cursor: pointer; border: 2px solid ' + (av === selectedAvatar ? 'var(--md-sys-color-primary)' : 'transparent');
+          item.addEventListener('click', () => {
+            selectedAvatar = av;
+            document.getElementById('edit-profile-avatar-preview').src = av;
+            Array.from(choicesBox.children).forEach(c => c.style.borderColor = 'transparent');
+            item.style.borderColor = 'var(--md-sys-color-primary)';
+          });
+          choicesBox.appendChild(item);
+        });
+      }
+      openModal(modalEditProfile);
+    }
+
+    if (btnCloseEditProfile) btnCloseEditProfile.addEventListener('click', () => closeModal(modalEditProfile));
+    if (btnCancelEditProfile) btnCancelEditProfile.addEventListener('click', () => closeModal(modalEditProfile));
+    if (btnSaveEditProfile) {
+      btnSaveEditProfile.addEventListener('click', () => {
+        const dName = document.getElementById('edit-profile-name').value.trim();
+        const uName = document.getElementById('edit-profile-username').value.trim();
+        const bio = document.getElementById('edit-profile-bio').value.trim();
+        const genresRaw = document.getElementById('edit-profile-genres').value;
+        const genres = genresRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+        window.RaserAccount.updateActiveProfile({
+          displayName: dName || 'User',
+          username: uName.toLowerCase().replace(/[^a-z0-9_]/g, '') || 'user',
+          bio: bio,
+          genres: genres,
+          avatar: selectedAvatar
+        });
+        closeModal(modalEditProfile);
+        showToast('Profile updated successfully!');
+        if (state.currentView === 'profile') renderProfileView();
+      });
+    }
+
+    // Modal: Add Friend
+    const modalAddFriend = document.getElementById('modal-add-friend');
+    const btnCloseAddFriend = document.getElementById('btn-close-add-friend-modal');
+    const btnCancelAddFriend = document.getElementById('btn-cancel-add-friend');
+    const btnSubmitAddFriend = document.getElementById('btn-submit-add-friend');
+    const inputFriendCode = document.getElementById('input-friend-code');
+    const addFriendStatus = document.getElementById('add-friend-status');
+
+    function openAddFriendModal() {
+      if (!modalAddFriend) return;
+      if (inputFriendCode) inputFriendCode.value = '';
+      if (addFriendStatus) {
+        addFriendStatus.classList.add('hidden');
+        addFriendStatus.textContent = '';
+      }
+      openModal(modalAddFriend);
+    }
+
+    if (btnCloseAddFriend) btnCloseAddFriend.addEventListener('click', () => closeModal(modalAddFriend));
+    if (btnCancelAddFriend) btnCancelAddFriend.addEventListener('click', () => closeModal(modalAddFriend));
+    if (btnSubmitAddFriend) {
+      btnSubmitAddFriend.addEventListener('click', () => {
+        const code = inputFriendCode.value.trim();
+        if (!code) return;
+        const res = window.RaserAccount.addFriendByCode(code);
+        if (res.success) {
+          closeModal(modalAddFriend);
+          showToast(`Now following ${res.friend.displayName}!`);
+          if (state.currentView === 'profile') renderProfileView();
+          renderFriendSideActivity();
+        } else {
+          addFriendStatus.classList.remove('hidden');
+          addFriendStatus.style.color = '#ff6b6b';
+          addFriendStatus.textContent = res.message || 'Could not add friend.';
+        }
+      });
+    }
+
+    // Modal: Switch Profile
+    const modalSwitchProfile = document.getElementById('modal-switch-profile');
+    const btnCloseSwitchProfile = document.getElementById('btn-close-switch-profile-modal');
+    const btnAddNewProfilePrompt = document.getElementById('btn-add-new-profile-prompt');
+
+    function openSwitchProfileModal() {
+      if (!modalSwitchProfile) return;
+      const listEl = document.getElementById('switch-profile-list');
+      const profiles = window.RaserAccount.getAllProfiles();
+      const active = window.RaserAccount.getActiveProfile();
+      if (listEl) {
+        listEl.innerHTML = '';
+        profiles.forEach(p => {
+          const isActive = p.id === active.id;
+          const row = document.createElement('div');
+          row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 12px; cursor: pointer; background: ' + (isActive ? 'color-mix(in srgb, var(--md-sys-color-primary) 18%, transparent)' : 'var(--md-sys-color-surface-container)') + ';';
+          row.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <img src="${p.avatar || window.RaserAccount.DEFAULT_AVATARS[0]}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+              <div style="display: flex; flex-direction: column;">
+                <span style="font-weight: 700; font-size: 13px; color: var(--md-sys-color-on-surface);">${escapeHtml(p.displayName || 'User')}</span>
+                <span style="font-size: 11px; color: var(--md-sys-color-outline);">@${escapeHtml(p.username || 'user')}</span>
+              </div>
+            </div>
+            ${isActive ? '<span style="font-size: 11px; font-weight: 700; color: var(--md-sys-color-primary);">ACTIVE</span>' : ''}
+          `;
+          row.addEventListener('click', () => {
+            window.RaserAccount.switchProfile(p.id);
+            closeModal(modalSwitchProfile);
+            showToast('Switched to account: ' + p.displayName);
+          });
+          listEl.appendChild(row);
+        });
+      }
+      openModal(modalSwitchProfile);
+    }
+
+    if (btnCloseSwitchProfile) btnCloseSwitchProfile.addEventListener('click', () => closeModal(modalSwitchProfile));
+    if (btnAddNewProfilePrompt) {
+      btnAddNewProfilePrompt.addEventListener('click', () => {
+        const name = prompt('Enter a display name for the new profile:');
+        if (name && name.trim()) {
+          const np = window.RaserAccount.createNewProfile(name.trim(), name.trim());
+          closeModal(modalSwitchProfile);
+          showToast('Created new profile: ' + np.displayName);
+        }
+      });
+    }
+
+    window.openTrackNoteModal = function(track) {
+      if (!track || !window.RaserAccount) return;
+      const modal = document.getElementById('modal-track-note');
+      if (!modal) return;
+      const preview = document.getElementById('track-note-meta-preview');
+      const input = document.getElementById('track-note-input');
+      const cid = getTrackCanonicalId(track);
+      const existing = window.RaserAccount.getNoteForTrack(cid);
+
+      if (preview) preview.textContent = (track.artist ? track.artist + ' - ' : '') + track.title;
+      if (input) input.value = existing ? existing.text : '';
+
+      const btnSave = document.getElementById('btn-save-track-note');
+      const btnDelete = document.getElementById('btn-delete-track-note');
+      const btnClose = document.getElementById('btn-close-track-note-modal');
+
+      if (btnDelete) btnDelete.style.display = existing ? 'inline-block' : 'none';
+
+      const cleanup = () => {
+        if (btnSave) btnSave.onclick = null;
+        if (btnDelete) btnDelete.onclick = null;
+        if (btnClose) btnClose.onclick = null;
+      };
+
+      if (btnSave) {
+        btnSave.onclick = () => {
+          window.RaserAccount.setTrackNote(cid, input.value, { title: track.title, artist: track.artist, thumbnail: track.thumbnail });
+          closeModal(modal);
+          showToast('Memory saved to song!');
+          if (state.currentView === 'profile') renderProfileView();
+          cleanup();
+        };
+      }
+
+      if (btnDelete) {
+        btnDelete.onclick = () => {
+          window.RaserAccount.setTrackNote(cid, '');
+          closeModal(modal);
+          showToast('Note deleted.');
+          if (state.currentView === 'profile') renderProfileView();
+          cleanup();
+        };
+      }
+
+      if (btnClose) {
+        btnClose.onclick = () => {
+          closeModal(modal);
+          cleanup();
+        };
+      }
+
+      openModal(modal);
+    };
+
+    renderFriendSideActivity();
+  }
+
+  function renderFriendSideActivity() {
+    const listEl = document.getElementById('friends-side-list');
+    if (!listEl || !window.RaserAccount) return;
+    const profile = window.RaserAccount.getActiveProfile();
+    const friends = (profile && profile.following) ? profile.following : [];
+
+    listEl.innerHTML = '';
+    if (friends.length === 0) {
+      listEl.innerHTML = '<div style="font-size: 12px; color: var(--md-sys-color-outline); padding: 12px 0; text-align: center;">Follow friends to see their listening activity here!</div>';
+      return;
+    }
+
+    friends.forEach(f => {
+      const item = document.createElement('div');
+      item.className = 'friend-side-item';
+      const isPlaying = f.lastTrack && f.lastTrack.playing;
+      const trackTitle = f.lastTrack ? f.lastTrack.title : 'Listening to music';
+      const trackArtist = f.lastTrack ? f.lastTrack.artist : 'Raser';
+      const timeStr = f.lastTrack ? f.lastTrack.time : 'Online';
+
+      item.innerHTML = `
+        <img class="friend-side-avatar" src="${escapeHtml(f.avatar || window.RaserAccount.DEFAULT_AVATARS[0])}" alt="">
+        <div class="friend-side-meta">
+          <span class="friend-side-name">${escapeHtml(f.displayName || f.username)}</span>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            ${isPlaying ? '<div class="friend-eq-anim"><span></span><span></span><span></span></div>' : ''}
+            <span class="friend-side-song ${isPlaying ? 'playing' : ''}">${escapeHtml(trackTitle)} • ${escapeHtml(trackArtist)}</span>
+          </div>
+          <span style="font-size: 10px; color: var(--md-sys-color-outline); margin-top: 2px;">${escapeHtml(timeStr)}</span>
+        </div>
+      `;
+
+      item.addEventListener('click', () => {
+        if (trackTitle && trackArtist) {
+          performSearch(trackArtist + ' ' + trackTitle);
+        }
+      });
+      listEl.appendChild(item);
+    });
+  }
+
+  function renderProfileView() {
+    if (!window.RaserAccount) return;
+    const profile = window.RaserAccount.getActiveProfile();
+    if (!profile) return;
+
+    // Hero
+    const avImg = document.getElementById('profile-avatar-display');
+    const nameEl = document.getElementById('profile-name-display');
+    const handleEl = document.getElementById('profile-handle-display');
+    const codeEl = document.getElementById('profile-code-display');
+    const bioEl = document.getElementById('profile-bio-display');
+    const genresEl = document.getElementById('profile-genres-display');
+
+    if (avImg) avImg.src = profile.avatar || window.RaserAccount.DEFAULT_AVATARS[0];
+    if (nameEl) nameEl.textContent = profile.displayName || 'User';
+    if (handleEl) handleEl.textContent = '@' + (profile.username || 'user');
+    if (codeEl) codeEl.textContent = profile.code || 'RS-MOTIVE';
+    if (bioEl) bioEl.textContent = profile.bio || 'Music enthusiast';
+
+    if (genresEl) {
+      genresEl.innerHTML = '';
+      (profile.genres || []).forEach(g => {
+        const span = document.createElement('span');
+        span.className = 'profile-genre-tag';
+        span.textContent = g;
+        genresEl.appendChild(span);
+      });
+    }
+
+    // Counters
+    const fCount = (profile.following || []).length;
+    const flwCount = profile.followersCount || 14;
+    const stats = profile.stats || { totalPlays: 0, totalDurationMinutes: 0, topArtists: {}, topTracks: [] };
+
+    const cFollowing = document.getElementById('stat-following-count');
+    const cFollowers = document.getElementById('stat-followers-count');
+    const cPlays = document.getElementById('stat-plays-count');
+    const cMinutes = document.getElementById('stat-minutes-count');
+    if (cFollowing) cFollowing.textContent = String(fCount);
+    if (cFollowers) cFollowers.textContent = String(flwCount);
+    if (cPlays) cPlays.textContent = String(stats.totalPlays || 0);
+    if (cMinutes) cMinutes.textContent = (stats.totalDurationMinutes || 0) + 'm';
+
+    // Overview Tab - Top Artists
+    const overviewArtistsEl = document.getElementById('profile-overview-artists');
+    if (overviewArtistsEl) {
+      overviewArtistsEl.innerHTML = '';
+      const artistEntries = Object.entries(stats.topArtists || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      if (artistEntries.length === 0) {
+        overviewArtistsEl.innerHTML = '<div style="font-size: 13px; color: var(--md-sys-color-outline);">Play some songs to build your top artists list!</div>';
+      } else {
+        artistEntries.forEach(([artName, count]) => {
+          const card = document.createElement('div');
+          card.style.cssText = 'display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100px; cursor: pointer; text-align: center;';
+          card.innerHTML = `
+            <div style="width: 72px; height: 72px; border-radius: 50%; overflow: hidden; background: var(--md-sys-color-surface-container-high); box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
+              <img src="https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+            <span style="font-weight: 700; font-size: 12px; color: var(--md-sys-color-on-surface); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">${escapeHtml(artName)}</span>
+            <span style="font-size: 11px; color: var(--md-sys-color-outline);">${count} plays</span>
+          `;
+          card.addEventListener('click', () => openArtistProfile(artName));
+          overviewArtistsEl.appendChild(card);
+        });
+      }
+    }
+
+    // Overview Tab - Top Songs
+    const overviewTracksEl = document.getElementById('profile-overview-tracks');
+    if (overviewTracksEl) {
+      overviewTracksEl.innerHTML = '';
+      const topT = stats.topTracks || [];
+      if (topT.length === 0) {
+        overviewTracksEl.innerHTML = '<div style="font-size: 13px; color: var(--md-sys-color-outline); padding: 12px 0;">No tracks logged yet. Listen to music to view your top tracks.</div>';
+      } else {
+        topT.slice(0, 5).forEach((t, i) => {
+          const row = document.createElement('div');
+          row.className = 'track-row';
+          row.innerHTML = `
+            <div class="track-row-num"><span class="track-num-text">${i + 1}</span></div>
+            <div class="track-row-title-wrap">
+              <span class="track-row-title">${escapeHtml(t.title)}</span>
+              <span class="track-row-artist">${escapeHtml(t.artist)}</span>
+            </div>
+            <div style="margin-left: auto; font-size: 12px; color: var(--md-sys-color-outline); font-weight: 600;">${t.plays} plays</div>
+          `;
+          row.addEventListener('click', () => performSearch(t.artist + ' ' + t.title));
+          overviewTracksEl.appendChild(row);
+        });
+      }
+    }
+
+    // Wrapped Tab
+    const wPlays = document.getElementById('wrapped-total-plays');
+    const wTime = document.getElementById('wrapped-total-time');
+    const wTopArtist = document.getElementById('wrapped-top-artist');
+    const wArtistList = document.getElementById('wrapped-artist-list');
+
+    if (wPlays) wPlays.textContent = String(stats.totalPlays || 0);
+    if (wTime) wTime.textContent = (stats.totalDurationMinutes || 0) + ' mins';
+    const topArtistName = Object.entries(stats.topArtists || {}).sort((a, b) => b[1] - a[1])[0];
+    if (wTopArtist) wTopArtist.textContent = topArtistName ? topArtistName[0] : 'None yet';
+
+    if (wArtistList) {
+      wArtistList.innerHTML = '';
+      const artistEntries = Object.entries(stats.topArtists || {}).sort((a, b) => b[1] - a[1]).slice(0, 8);
+      const maxPlays = artistEntries.length > 0 ? artistEntries[0][1] : 1;
+
+      artistEntries.forEach(([artName, count], idx) => {
+        const pct = Math.round((count / maxPlays) * 100);
+        const item = document.createElement('div');
+        item.style.cssText = 'display: flex; flex-direction: column; gap: 4px; padding: 8px 0;';
+        item.innerHTML = `
+          <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600;">
+            <span style="color: var(--md-sys-color-on-surface);">${idx + 1}. ${escapeHtml(artName)}</span>
+            <span style="color: var(--md-sys-color-outline);">${count} plays</span>
+          </div>
+          <div style="height: 6px; border-radius: 3px; background: var(--md-sys-color-surface-container); overflow: hidden;">
+            <div style="height: 100%; width: ${pct}%; background: var(--md-sys-color-primary); border-radius: 3px;"></div>
+          </div>
+        `;
+        wArtistList.appendChild(item);
+      });
+    }
+
+    // Friends Tab
+    const friendsGrid = document.getElementById('profile-friends-grid');
+    const friendsCount = document.getElementById('friends-list-count');
+    const friends = profile.following || [];
+    if (friendsCount) friendsCount.textContent = String(friends.length);
+
+    if (friendsGrid) {
+      friendsGrid.innerHTML = '';
+      if (friends.length === 0) {
+        friendsGrid.innerHTML = '<div style="font-size: 13px; color: var(--md-sys-color-outline);">You are not following anyone yet. Add a friend using their Raser Code!</div>';
+      } else {
+        friends.forEach(f => {
+          const card = document.createElement('div');
+          card.className = 'friend-card';
+          const isPlaying = f.lastTrack && f.lastTrack.playing;
+          card.innerHTML = `
+            <img class="friend-card-avatar" src="${escapeHtml(f.avatar || window.RaserAccount.DEFAULT_AVATARS[0])}" alt="">
+            <div class="friend-card-info">
+              <span class="friend-card-name">${escapeHtml(f.displayName || f.username)}</span>
+              <span style="font-size: 11px; color: var(--md-sys-color-outline);">@${escapeHtml(f.username || 'user')} • ${escapeHtml(f.code || '')}</span>
+              ${f.lastTrack ? `
+                <div class="friend-card-track">
+                  ${isPlaying ? '<div class="friend-eq-anim"><span></span><span></span><span></span></div>' : ''}
+                  <span>${escapeHtml(f.lastTrack.title)} - ${escapeHtml(f.lastTrack.artist)}</span>
+                </div>
+              ` : ''}
+            </div>
+            <button class="btn-outline-pill" style="height: 28px; padding: 0 10px; font-size: 11px;">Listen</button>
+          `;
+          card.querySelector('button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (f.lastTrack) performSearch(f.lastTrack.artist + ' ' + f.lastTrack.title);
+          });
+          friendsGrid.appendChild(card);
+        });
+      }
+    }
+
+    // Music Memories & Notes Tab
+    const notesContainer = document.getElementById('profile-track-notes-container');
+    if (notesContainer) {
+      notesContainer.innerHTML = '';
+      const notesObj = window.RaserAccount.getTrackNotes();
+      const entries = Object.entries(notesObj);
+      if (entries.length === 0) {
+        notesContainer.innerHTML = '<div style="font-size: 13px; color: var(--md-sys-color-outline);">No music notes saved yet. Add a personal memory to any song!</div>';
+      } else {
+        entries.forEach(([cid, noteData]) => {
+          const card = document.createElement('div');
+          card.className = 'track-note-card';
+          const title = noteData.track ? (noteData.track.title + ' - ' + noteData.track.artist) : 'Track: ' + cid;
+          const dateStr = noteData.date ? new Date(noteData.date).toLocaleDateString() : '';
+          card.innerHTML = `
+            <span class="track-note-song-title">${escapeHtml(title)}</span>
+            <p class="track-note-text">"${escapeHtml(noteData.text)}"</p>
+            <span class="track-note-date">${escapeHtml(dateStr)}</span>
+          `;
+          card.addEventListener('click', () => {
+            if (noteData.track) performSearch(noteData.track.title);
+          });
+          notesContainer.appendChild(card);
+        });
+      }
+    }
+  }
+
+  initAccountAndSocialSystem();
 
   emitPluginEvent('ready');
 });

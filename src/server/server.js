@@ -694,7 +694,7 @@ function cleanSearchResults(tracks, query) {
   const minimumRelevance = queryTokens.length > 1 ? Math.max(2, Math.ceil(queryTokens.length / 2)) : queryTokens.length;
   const seenIds = new Set();
   const seenTracks = new Set();
-  return (Array.isArray(tracks) ? tracks : [])
+  const mapped = (Array.isArray(tracks) ? tracks : [])
     .map((track, index) => {
       const clean = normalizeTrack(track);
       if (!clean) return null;
@@ -718,8 +718,20 @@ function cleanSearchResults(tracks, query) {
         (queryTokens.length < 2 ||
           (item.titleRelevance > 0 && item.artistRelevance > 0) ||
           item.titleRelevance === queryTokens.length ||
-          item.artistRelevance === queryTokens.length))))
-    .sort((a, b) => b.relevance - a.relevance || a.index - b.index)
+          item.artistRelevance === queryTokens.length))));
+
+  const artistMatchesCount = queryTokens.length ? mapped.filter(item => item.artistRelevance === queryTokens.length).length : 0;
+  const isArtistQuery = artistMatchesCount >= 2;
+
+  return mapped
+    .sort((a, b) => {
+      if (isArtistQuery) {
+        const aArtistExact = a.artistRelevance === queryTokens.length ? 1 : 0;
+        const bArtistExact = b.artistRelevance === queryTokens.length ? 1 : 0;
+        if (aArtistExact !== bArtistExact) return bArtistExact - aArtistExact;
+      }
+      return (b.relevance - a.relevance) || (a.index - b.index);
+    })
     .filter(({ track, clean }) => {
       const idKey = clean.id ? `${clean.platform}:${clean.id}` : '';
       const fingerprint = trackFingerprint(track);
@@ -3543,6 +3555,8 @@ async function fetchArtistInfo(artistName, hintTrack = '') {
     });
 
     const candidates = (dzRes && Array.isArray(dzRes.data)) ? dzRes.data : [];
+    // Sort all candidates by popularity (fans) so top artists take precedence over obscure namesake profiles
+    candidates.sort((a, b) => (b.nb_fan || 0) - (a.nb_fan || 0));
     const matchingCandidates = candidates.filter(c => c && norm(c.name) === normClean);
 
     if (matchingCandidates.length === 1) {
@@ -3587,7 +3601,7 @@ async function fetchArtistInfo(artistName, hintTrack = '') {
     banner = avatar;
     fansCount = artistMatch.nb_fan || 0;
     isKnownArtist = true;
-    isVerified = fansCount > 30000;
+    isVerified = fansCount > 10000;
 
     try {
       const topData = await new Promise((resolve) => {
