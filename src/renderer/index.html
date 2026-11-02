@@ -4131,21 +4131,21 @@
           <input type="email" id="reg-input-email" class="pill-text-input" placeholder="E-posta adresi" autocomplete="email">
           <input type="password" id="reg-input-password" class="pill-text-input" placeholder="Şifre (en az 6 karakter)" autocomplete="new-password">
 
-          <!-- Genre Selection -->
-          <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
-            <span style="font-size: 12px; font-weight: 700; color: var(--md-sys-color-on-surface);">Sevdiğin Müzik Türleri:</span>
-            <div id="reg-genre-chips" style="display: flex; flex-wrap: wrap; gap: 6px;">
-              <span class="genre-selectable-chip active" data-genre="Hip-Hop">Hip-Hop</span>
-              <span class="genre-selectable-chip active" data-genre="Türkçe Rap">Türkçe Rap</span>
-              <span class="genre-selectable-chip active" data-genre="Trap">Trap</span>
-              <span class="genre-selectable-chip" data-genre="Drill">Drill</span>
-              <span class="genre-selectable-chip" data-genre="R&B">R&B</span>
-              <span class="genre-selectable-chip" data-genre="Pop">Pop</span>
-              <span class="genre-selectable-chip" data-genre="Rock">Rock</span>
-              <span class="genre-selectable-chip" data-genre="Elektronik">Elektronik</span>
-              <span class="genre-selectable-chip" data-genre="Lo-Fi">Lo-Fi</span>
-              <span class="genre-selectable-chip" data-genre="Akustik">Akustik</span>
+          <!-- Spotify-Style Artist Selection & Search -->
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 13px; font-weight: 700; color: var(--md-sys-color-on-surface);">Sevdiğin Sanatçıları Seç:</span>
+              <span id="reg-artists-count-badge" style="font-size: 11px; font-weight: 600; color: var(--md-sys-color-primary); background: color-mix(in srgb, var(--md-sys-color-primary) 16%, transparent); padding: 2px 8px; border-radius: 10px;">0 seçildi</span>
             </div>
+
+            <!-- Artist Search Input -->
+            <div style="position: relative;">
+              <input type="text" id="reg-artist-search" class="pill-text-input" placeholder="Sanatçı ara... (örn: Motive, Ezhel, Travis Scott)" autocomplete="off" style="font-size: 12px; height: 36px; padding-left: 32px; border-radius: 18px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position: absolute; left: 12px; top: 11px; color: var(--md-sys-color-outline); pointer-events: none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
+
+            <!-- Artists Grid (Recommended & Searched) -->
+            <div id="reg-artists-grid" class="reg-artists-grid"></div>
           </div>
 
           <!-- Avatar Selection -->

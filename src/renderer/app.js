@@ -27398,21 +27398,126 @@ function bindCoverHoldZoom(wrapEl) {
     const regInputUsername = document.getElementById('reg-input-username');
     const regInputEmail = document.getElementById('reg-input-email');
     const regInputPassword = document.getElementById('reg-input-password');
-    const regGenreChips = document.getElementById('reg-genre-chips');
+    const regArtistSearch = document.getElementById('reg-artist-search');
+    const regArtistsGrid = document.getElementById('reg-artists-grid');
+    const regArtistsCountBadge = document.getElementById('reg-artists-count-badge');
     const regAvatarChoices = document.getElementById('reg-avatar-choices');
     const btnFbRegister = document.getElementById('btn-fb-register');
     const fbAuthStatus = document.getElementById('fb-auth-status');
 
     let regSelectedAvatar = window.RaserAccount.DEFAULT_AVATARS[0];
+    const selectedArtists = new Map();
 
-    function setupGenreChips() {
-      if (!regGenreChips) return;
-      const chips = regGenreChips.querySelectorAll('.genre-selectable-chip');
-      chips.forEach(chip => {
-        chip.onclick = () => {
-          chip.classList.toggle('active');
+    const RECOMMENDED_ONBOARDING_ARTISTS = [
+      { name: 'Motive', image: 'https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg' },
+      { name: 'Uzi', image: 'https://cdn-images.dzcdn.net/images/artist/1e749f783ee8964ceec04097f48037c7/250x250-000000-80-0-0.jpg' },
+      { name: 'Batuflex', image: 'https://cdn-images.dzcdn.net/images/artist/c710c0e95ae86c52b07e5b15a6b0cfa0/250x250-000000-80-0-0.jpg' },
+      { name: 'BLOK3', image: 'https://cdn-images.dzcdn.net/images/artist/33e60126ae83dc6170d5dd70a3111ff3/250x250-000000-80-0-0.jpg' },
+      { name: 'Lvbel C5', image: 'https://cdn-images.dzcdn.net/images/artist/ff672cb70503f2ff2baeb39cf8dbff97/250x250-000000-80-0-0.jpg' },
+      { name: 'cakal', image: 'https://cdn-images.dzcdn.net/images/artist/06cf1df5514f04d538f9b9f7cb212e5c/250x250-000000-80-0-0.jpg' },
+      { name: 'Ezhel', image: 'https://cdn-images.dzcdn.net/images/artist/d1e7c536ce44062f6b8cf01b97b05537/250x250-000000-80-0-0.jpg' },
+      { name: 'Ati242', image: 'https://cdn-images.dzcdn.net/images/artist/7339d6ea4f9c566fc68ce61d7b05615e/250x250-000000-80-0-0.jpg' },
+      { name: 'Sagopa Kajmer', image: 'https://cdn-images.dzcdn.net/images/artist/abf21f1d1dc4254f39572c842fe31cb1/250x250-000000-80-0-0.jpg' },
+      { name: 'Ceza', image: 'https://cdn-images.dzcdn.net/images/artist/f1fa5c26b2b7194f475a87ba98797960/250x250-000000-80-0-0.jpg' },
+      { name: 'Travis Scott', image: 'https://cdn-images.dzcdn.net/images/artist/e718b57738ee0ae182c161eb30851f50/250x250-000000-80-0-0.jpg' },
+      { name: 'The Weeknd', image: 'https://cdn-images.dzcdn.net/images/artist/c1b2695574511ef78f0d84f0fbdf13e5/250x250-000000-80-0-0.jpg' },
+      { name: 'Drake', image: 'https://cdn-images.dzcdn.net/images/artist/2302e1c944747ebafbeff9fd65203b0c/250x250-000000-80-0-0.jpg' },
+      { name: 'Eminem', image: 'https://cdn-images.dzcdn.net/images/artist/1c463ee9a3d4f40f09ce614399e5a1b3/250x250-000000-80-0-0.jpg' },
+      { name: 'Billie Eilish', image: 'https://cdn-images.dzcdn.net/images/artist/1e3b2e53fa3b429074092490d1f11c75/250x250-000000-80-0-0.jpg' },
+      { name: 'Kendrick Lamar', image: 'https://cdn-images.dzcdn.net/images/artist/9166f3661eb1a478b006bcfa7e5ec8f6/250x250-000000-80-0-0.jpg' }
+    ];
+
+    // Pre-select Motive as favorite default
+    selectedArtists.set('Motive', RECOMMENDED_ONBOARDING_ARTISTS[0]);
+
+    function renderArtistGrid(artistList) {
+      if (!regArtistsGrid) return;
+      regArtistsGrid.innerHTML = '';
+
+      if (!artistList || artistList.length === 0) {
+        regArtistsGrid.innerHTML = '<div style="grid-column: 1 / -1; font-size: 12px; color: var(--md-sys-color-outline); padding: 18px 0; text-align: center;">Sanatçı bulunamadı. Farklı bir arama deneyebilirsin.</div>';
+        return;
+      }
+
+      artistList.forEach(art => {
+        const item = document.createElement('div');
+        item.className = 'reg-artist-item' + (selectedArtists.has(art.name) ? ' selected' : '');
+        item.innerHTML = `
+          <div class="reg-artist-avatar-wrap">
+            <img src="${escapeHtml(art.image || 'https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg')}" alt="${escapeHtml(art.name)}" loading="lazy">
+            <div class="reg-artist-check">✓</div>
+          </div>
+          <span class="reg-artist-name">${escapeHtml(art.name)}</span>
+        `;
+
+        item.onclick = () => {
+          if (selectedArtists.has(art.name)) {
+            selectedArtists.delete(art.name);
+            item.classList.remove('selected');
+          } else {
+            selectedArtists.set(art.name, art);
+            item.classList.add('selected');
+          }
+          if (regArtistsCountBadge) {
+            regArtistsCountBadge.textContent = `${selectedArtists.size} seçildi`;
+          }
         };
+
+        regArtistsGrid.appendChild(item);
       });
+
+      if (regArtistsCountBadge) {
+        regArtistsCountBadge.textContent = `${selectedArtists.size} seçildi`;
+      }
+    }
+
+    let artistSearchDebounceTimer = null;
+    function setupArtistSearch() {
+      renderArtistGrid(RECOMMENDED_ONBOARDING_ARTISTS);
+
+      if (regArtistSearch) {
+        regArtistSearch.addEventListener('input', () => {
+          clearTimeout(artistSearchDebounceTimer);
+          const q = regArtistSearch.value.trim();
+
+          if (!q) {
+            renderArtistGrid(RECOMMENDED_ONBOARDING_ARTISTS);
+            return;
+          }
+
+          // Filter local list first
+          const localMatches = RECOMMENDED_ONBOARDING_ARTISTS.filter(a => a.name.toLowerCase().includes(q.toLowerCase()));
+          if (localMatches.length > 0) {
+            renderArtistGrid(localMatches);
+          }
+
+          // Search server for live artists
+          artistSearchDebounceTimer = setTimeout(async () => {
+            try {
+              const res = await fetch('/api/search?q=' + encodeURIComponent(q) + '&t=' + Date.now());
+              if (!res.ok) return;
+              const data = await res.json();
+              const items = Array.isArray(data) ? data : (data.results || []);
+
+              const discoveredArtists = new Map();
+              localMatches.forEach(m => discoveredArtists.set(m.name, m));
+
+              items.forEach(t => {
+                if (t.artist && !discoveredArtists.has(t.artist)) {
+                  discoveredArtists.set(t.artist, {
+                    name: t.artist,
+                    image: t.thumbnail || 'https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg'
+                  });
+                }
+              });
+
+              if (regArtistSearch.value.trim() === q && discoveredArtists.size > 0) {
+                renderArtistGrid(Array.from(discoveredArtists.values()).slice(0, 16));
+              }
+            } catch (_) {}
+          }, 280);
+        });
+      }
     }
 
     function setupAvatarChoices() {
@@ -27431,7 +27536,7 @@ function bindCoverHoldZoom(wrapEl) {
       });
     }
 
-    setupGenreChips();
+    setupArtistSearch();
     setupAvatarChoices();
 
     function updateCloudStatusUI() {
@@ -27568,16 +27673,18 @@ function bindCoverHoldZoom(wrapEl) {
           return;
         }
 
-        const selectedGenres = [];
-        if (regGenreChips) {
-          regGenreChips.querySelectorAll('.genre-selectable-chip.active').forEach(c => {
-            selectedGenres.push(c.dataset.genre);
-          });
-        }
-
+        const chosenArtists = Array.from(selectedArtists.keys());
         btnFbRegister.disabled = true;
         btnFbRegister.textContent = 'Hesap oluşturuluyor...';
-        const res = await window.RaserFirebase.registerWithEmail(email, pass, dName || 'Müziksever', uName || 'user', selectedGenres, regSelectedAvatar);
+        const res = await window.RaserFirebase.registerWithEmail(
+          email,
+          pass,
+          dName || 'Müziksever',
+          uName || 'user',
+          ['Hip-Hop', 'Rap', 'Turkish Trap'],
+          regSelectedAvatar,
+          chosenArtists.length > 0 ? chosenArtists : ['Motive']
+        );
         btnFbRegister.disabled = false;
         btnFbRegister.textContent = 'Kayıt Ol ve Başla';
 

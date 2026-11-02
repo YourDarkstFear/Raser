@@ -71,7 +71,7 @@
   }
 
   // Auth Functions
-  async function registerWithEmail(email, password, displayName = '', username = '', genres = null, avatar = null) {
+  async function registerWithEmail(email, password, displayName = '', username = '', genres = null, avatar = null, favoriteArtists = null) {
     if (!isInitialized && !initFirebase()) {
       return { success: false, message: 'Could not connect to authentication services.' };
     }
@@ -80,6 +80,16 @@
       const user = cred.user;
       if (displayName) {
         await user.updateProfile({ displayName: displayName });
+      }
+
+      // Initial top artists from chosen artists
+      const initialTopArtists = {};
+      if (Array.isArray(favoriteArtists) && favoriteArtists.length > 0) {
+        favoriteArtists.forEach((a, i) => {
+          initialTopArtists[a] = Math.max(1, (favoriteArtists.length - i) * 3);
+        });
+      } else {
+        initialTopArtists['Motive'] = 10;
       }
 
       // Create user document in Firestore
@@ -94,8 +104,9 @@
         avatar: avatar || '',
         bio: 'Listening to music on Raser 🎵',
         genres: Array.isArray(genres) && genres.length > 0 ? genres : ['Hip-Hop', 'Rap', 'Turkish Trap'],
+        favoriteArtists: Array.isArray(favoriteArtists) ? favoriteArtists : ['Motive'],
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        stats: { totalPlays: 0, totalDurationMinutes: 0, topArtists: {}, topTracks: [] }
+        stats: { totalPlays: favoriteArtists ? favoriteArtists.length * 3 : 10, totalDurationMinutes: 30, topArtists: initialTopArtists, topTracks: [] }
       };
 
       await db.collection('users').doc(user.uid).set(profileData, { merge: true });
@@ -108,6 +119,8 @@
           code: profileData.code,
           avatar: profileData.avatar || (window.RaserAccount.getActiveProfile() ? window.RaserAccount.getActiveProfile().avatar : ''),
           genres: profileData.genres,
+          favoriteArtists: profileData.favoriteArtists,
+          stats: profileData.stats,
           firebaseUid: user.uid
         });
       }

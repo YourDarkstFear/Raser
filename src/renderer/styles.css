@@ -11699,3 +11699,90 @@ body.perf .np-queue-panel { transition: none; }
   font-weight: 700;
   box-shadow: 0 0 12px color-mix(in srgb, var(--md-sys-color-primary) 30%, transparent);
 }
+
+/* Spotify-style Artist Onboarding Grid */
+.reg-artists-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 6px 2px;
+  border-radius: 14px;
+}
+.reg-artists-grid::-webkit-scrollbar {
+  width: 5px;
+}
+.reg-artists-grid::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--md-sys-color-outline) 25%, transparent);
+  border-radius: 4px;
+}
+.reg-artist-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  text-align: center;
+  position: relative;
+  padding: 4px;
+  border-radius: 12px;
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1);
+  user-select: none;
+}
+.reg-artist-item:hover {
+  transform: translateY(-2px);
+}
+.reg-artist-avatar-wrap {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  background: var(--md-sys-color-surface-container-high);
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+.reg-artist-avatar-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.reg-artist-check {
+  display: none;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--md-sys-color-primary);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.reg-artist-item.selected .reg-artist-avatar-wrap {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--md-sys-color-primary) 55%, transparent);
+}
+.reg-artist-item.selected .reg-artist-check {
+  display: flex;
+}
+.reg-artist-item.selected .reg-artist-name {
+  color: var(--md-sys-color-primary);
+  font-weight: 700;
+}
+.reg-artist-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  max-width: 80px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.2s ease;
+}
