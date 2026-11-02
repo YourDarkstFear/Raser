@@ -13747,7 +13747,7 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
 
     requestAnimationFrame(() => {
       document.querySelectorAll('.no-enter-anim').forEach(c => c.classList.remove('no-enter-anim'));
-      [el.viewDiscover, el.viewProfile, el.viewFavorites, el.viewAlbums, el.viewLocal, el.viewHistory, el.viewQueue, el.viewPlaylistDetail, el.viewAlbum, el.viewArtist, el.viewSettings].forEach(v => {
+      [el.viewDiscover, el.viewProfile, el.viewFavorites, el.viewAlbums, el.viewLocal, el.viewHistory, el.viewQueue, el.viewPlaylistDetail, el.viewAlbum, el.viewArtist, el.viewSettings, document.getElementById('view-auth'), document.getElementById('view-edit-profile')].forEach(v => {
         if (v) v.classList.remove('active');
       });
 
@@ -13801,9 +13801,17 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
             showSettingsCategory((savedCat === 'overview' || !savedCat) ? 'home' : savedCat);
             updateOfflineStorageUI();
             updateMusicFolderUI();
-  updateDownloadFolderUI();
-  updateDownloadCaptionPath();
+            updateDownloadFolderUI();
+            updateDownloadCaptionPath();
             checkToolsStatus(false);
+          } else if (viewName === 'auth') {
+            const vAuth = document.getElementById('view-auth');
+            if (vAuth) vAuth.classList.add('active');
+            if (typeof renderAuthView === 'function') renderAuthView();
+          } else if (viewName === 'edit-profile') {
+            const vEdit = document.getElementById('view-edit-profile');
+            if (vEdit) vEdit.classList.add('active');
+            if (typeof renderEditProfileView === 'function') renderEditProfileView();
           }
 
           updateNavIndicator(true);

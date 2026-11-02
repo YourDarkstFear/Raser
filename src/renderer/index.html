@@ -676,6 +676,163 @@
         </div>
       </section>
 
+      <!-- Full Page View: Auth & Registration -->
+      <section class="content-view" id="view-auth">
+        <div class="auth-page-view">
+          <button class="btn-icon-pill" id="btn-back-auth" title="Back" style="margin-bottom: 20px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          </button>
+
+          <div class="auth-card-container">
+            <div class="auth-card-header">
+              <div class="auth-app-logo">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+              </div>
+              <h1 class="auth-page-title">Raser Hesabı</h1>
+              <p class="auth-page-subtitle">Müzik zevkini keşfet, istatistiklerini kaydet ve arkadaşlarınla senkronize ol.</p>
+            </div>
+
+            <!-- Logged In State Box -->
+            <div id="auth-logged-in-box" class="auth-logged-in-box hidden">
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <img id="auth-user-avatar" src="" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover;">
+                <div style="display: flex; flex-direction: column;">
+                  <span id="auth-user-name" style="font-size: 18px; font-weight: 700; color: var(--md-sys-color-on-surface);">User</span>
+                  <span id="auth-user-email" style="font-size: 13px; color: var(--md-sys-color-outline);">user@email.com</span>
+                  <span style="font-size: 12px; color: var(--md-sys-color-primary); font-weight: 600; margin-top: 4px;">🟢 Hesabın Senkronize</span>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; margin-top: 14px;">
+                <button type="button" class="btn-pill-primary" id="btn-auth-goto-profile" style="flex: 1; height: 40px; font-weight: 700;">Profilime Git</button>
+                <button type="button" class="btn-outline-pill" id="btn-auth-logout" style="flex: 1; height: 40px;">Çıkış Yap</button>
+              </div>
+            </div>
+
+            <!-- Sign In / Register Forms -->
+            <div id="auth-form-container" class="auth-form-container">
+              <div class="profile-nav-tabs" style="margin-bottom: 20px;">
+                <button class="profile-tab-btn active" id="auth-tab-btn-signin">Giriş Yap</button>
+                <button class="profile-tab-btn" id="auth-tab-btn-register">Hesap Oluştur</button>
+              </div>
+
+              <!-- Sign In Form -->
+              <div id="auth-pane-signin" class="auth-pane">
+                <div class="auth-input-group">
+                  <label class="auth-input-label">E-posta</label>
+                  <input type="email" id="auth-input-email" class="pill-text-input" placeholder="ornek@email.com" autocomplete="email">
+                </div>
+                <div class="auth-input-group">
+                  <label class="auth-input-label">Şifre</label>
+                  <input type="password" id="auth-input-password" class="pill-text-input" placeholder="Şifreniz" autocomplete="current-password">
+                </div>
+                <button type="button" class="btn-pill-primary auth-submit-btn" id="btn-auth-signin">Giriş Yap</button>
+              </div>
+
+              <!-- Register & Onboarding Form -->
+              <div id="auth-pane-register" class="auth-pane hidden">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div class="auth-input-group">
+                    <label class="auth-input-label">Görünen Ad</label>
+                    <input type="text" id="auth-reg-name" class="pill-text-input" placeholder="Adınız">
+                  </div>
+                  <div class="auth-input-group">
+                    <label class="auth-input-label">Kullanıcı Adı (@)</label>
+                    <input type="text" id="auth-reg-username" class="pill-text-input" placeholder="kullaniciadi">
+                  </div>
+                </div>
+
+                <div class="auth-input-group">
+                  <label class="auth-input-label">E-posta Adresi</label>
+                  <input type="email" id="auth-reg-email" class="pill-text-input" placeholder="ornek@email.com" autocomplete="email">
+                </div>
+                <div class="auth-input-group">
+                  <label class="auth-input-label">Şifre</label>
+                  <input type="password" id="auth-reg-password" class="pill-text-input" placeholder="En az 6 karakter" autocomplete="new-password">
+                </div>
+
+                <!-- Spotify-Style Artist Selection & Search -->
+                <div class="auth-artist-section">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span class="auth-input-label" style="margin: 0; font-size: 13px; font-weight: 700;">Sevdiğin Sanatçıları Seç</span>
+                    <span id="auth-artists-count-badge" class="auth-badge">0 seçildi</span>
+                  </div>
+
+                  <div style="position: relative; margin-bottom: 12px;">
+                    <input type="text" id="auth-artist-search" class="pill-text-input" placeholder="Sanatçı ara... (örn: Motive, Ezhel, Travis Scott)" autocomplete="off" style="padding-left: 36px; height: 38px; border-radius: 19px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position: absolute; left: 14px; top: 12px; color: var(--md-sys-color-outline); pointer-events: none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  </div>
+
+                  <div id="auth-artists-grid" class="reg-artists-grid"></div>
+                </div>
+
+                <!-- Avatar Selection -->
+                <div class="auth-input-group" style="margin-top: 14px;">
+                  <label class="auth-input-label">Profil Avatarı</label>
+                  <div id="auth-avatar-choices" style="display: flex; gap: 12px; align-items: center;"></div>
+                </div>
+
+                <button type="button" class="btn-pill-primary auth-submit-btn" id="btn-auth-register" style="margin-top: 16px;">Kayıt Ol ve Başla</button>
+              </div>
+
+              <div id="auth-status-msg" class="hidden" style="font-size: 13px; text-align: center; margin-top: 10px;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Full Page View: Edit Profile -->
+      <section class="content-view" id="view-edit-profile">
+        <div class="edit-profile-view">
+          <button class="btn-icon-pill" id="btn-back-edit-profile" title="Back" style="margin-bottom: 20px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          </button>
+
+          <div class="edit-profile-container">
+            <h1 class="section-title" style="margin-bottom: 6px;">Profili Düzenle</h1>
+            <p class="view-subtitle" style="margin-bottom: 24px;">Raser profilini, görünen adını ve tercihlerini özelleştir.</p>
+
+            <div class="edit-profile-layout">
+              <!-- Left side: Avatar & Visuals -->
+              <div class="edit-profile-side">
+                <div class="edit-avatar-big-wrap">
+                  <img id="edit-page-avatar-preview" src="" alt="Avatar Preview">
+                </div>
+                <span style="font-size: 13px; font-weight: 600; color: var(--md-sys-color-on-surface); margin-top: 14px;">Avatar Seç</span>
+                <div id="edit-page-avatar-choices" style="display: flex; gap: 10px; margin-top: 8px;"></div>
+              </div>
+
+              <!-- Right side: Fields -->
+              <div class="edit-profile-form">
+                <div class="auth-input-group">
+                  <label class="auth-input-label">Görünen Ad</label>
+                  <input type="text" id="edit-page-name" class="pill-text-input" placeholder="Adınız">
+                </div>
+
+                <div class="auth-input-group">
+                  <label class="auth-input-label">Kullanıcı Adı (@handle)</label>
+                  <input type="text" id="edit-page-username" class="pill-text-input" placeholder="kullaniciadi">
+                </div>
+
+                <div class="auth-input-group">
+                  <label class="auth-input-label">Biyografi & Hakkında</label>
+                  <textarea id="edit-page-bio" class="pill-text-input" rows="3" style="border-radius: 14px; resize: none;" placeholder="Kendinden, müzik zevkinden bahset..."></textarea>
+                </div>
+
+                <div class="auth-input-group">
+                  <label class="auth-input-label">Müzik Türleri (Virgülle ayırın)</label>
+                  <input type="text" id="edit-page-genres" class="pill-text-input" placeholder="Hip-Hop, Rap, Trap, R&B">
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                  <button type="button" class="btn-pill-primary" id="btn-save-page-profile" style="padding: 10px 28px; font-weight: 700;">Değişiklikleri Kaydet</button>
+                  <button type="button" class="btn-outline-pill" id="btn-cancel-page-profile" style="padding: 10px 24px;">İptal</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="content-view" id="view-settings">
         <div class="settings-view">
           <h2 class="section-title">Settings</h2>
@@ -3970,47 +4127,6 @@
     </div>
   </div>
 
-  <!-- Modal: Edit Profile -->
-  <div class="modal-backdrop hidden" id="modal-edit-profile">
-    <div class="dialog-card" style="width: 440px;">
-      <div class="dialog-header">
-        <h3 class="dialog-title">Edit Profile</h3>
-        <button class="btn-icon-pill" id="btn-close-edit-profile-modal">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-      <div class="dialog-content" style="display: flex; flex-direction: column; gap: 14px;">
-        <div style="display: flex; gap: 16px; align-items: center;">
-          <img id="edit-profile-avatar-preview" src="" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: var(--md-sys-color-surface-container);">
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            <label style="font-size: 12px; font-weight: 600; color: var(--md-sys-color-on-surface);">Profile Avatar</label>
-            <div style="display: flex; gap: 8px;" id="avatar-choices-container"></div>
-          </div>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          <label style="font-size: 12px; font-weight: 600; color: var(--md-sys-color-on-surface);">Display Name</label>
-          <input type="text" id="edit-profile-name" class="pill-text-input" placeholder="Display name">
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          <label style="font-size: 12px; font-weight: 600; color: var(--md-sys-color-on-surface);">Username (@handle)</label>
-          <input type="text" id="edit-profile-username" class="pill-text-input" placeholder="username">
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          <label style="font-size: 12px; font-weight: 600; color: var(--md-sys-color-on-surface);">Bio</label>
-          <textarea id="edit-profile-bio" class="pill-text-input" rows="2" style="border-radius: 12px; resize: none;" placeholder="Tell listeners about yourself..."></textarea>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          <label style="font-size: 12px; font-weight: 600; color: var(--md-sys-color-on-surface);">Favorite Genres (comma-separated)</label>
-          <input type="text" id="edit-profile-genres" class="pill-text-input" placeholder="Hip-Hop, Rap, Trap">
-        </div>
-      </div>
-      <div class="dialog-actions" style="margin-top: 16px;">
-        <button type="button" class="btn-outline-pill" id="btn-cancel-edit-profile">Cancel</button>
-        <button type="button" class="btn-pill-primary" id="btn-save-edit-profile">Save</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Modal: Add Friend -->
   <div class="modal-backdrop hidden" id="modal-add-friend">
     <div class="dialog-card" style="width: 420px;">
@@ -4067,98 +4183,6 @@
         <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 14%, transparent);">
           <button type="button" class="btn-outline-pill" id="btn-add-new-profile-prompt" style="width: 100%;">+ Create New Profile</button>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Raser Account & Auth -->
-  <div class="modal-backdrop hidden" id="modal-firebase-connect">
-    <div class="dialog-card" style="width: 480px; max-height: 88vh; overflow-y: auto;">
-      <div class="dialog-header">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <div style="width: 28px; height: 28px; border-radius: 8px; background: var(--md-sys-color-primary); display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
-          </div>
-          <h3 class="dialog-title" id="raser-account-modal-title">Raser Hesabı</h3>
-        </div>
-        <button class="btn-icon-pill" id="btn-close-firebase-modal">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-
-      <!-- Logged In Card -->
-      <div id="firebase-logged-in-box" class="hidden" style="display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 16px; background: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent); border: 1px solid color-mix(in srgb, var(--md-sys-color-primary) 24%, transparent);">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <img id="raser-active-user-avatar" src="" style="width: 46px; height: 46px; border-radius: 50%; object-fit: cover;">
-          <div style="display: flex; flex-direction: column;">
-            <span id="raser-active-user-name" style="font-size: 15px; font-weight: 700; color: var(--md-sys-color-on-surface);">User</span>
-            <span id="firebase-user-email" style="font-size: 12px; color: var(--md-sys-color-outline);">user@email.com</span>
-          </div>
-        </div>
-        <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 15%, transparent);">
-          <span style="font-size: 12px; color: var(--md-sys-color-primary); font-weight: 600;">🟢 Hesabın Senkronize</span>
-          <button type="button" class="btn-outline-pill" id="btn-firebase-logout" style="height: 30px; font-size: 12px; padding: 0 14px;">Çıkış Yap</button>
-        </div>
-      </div>
-
-      <!-- Auth Container (Giriş Yap / Kayıt Ol) -->
-      <div id="raser-auth-container" style="display: flex; flex-direction: column; gap: 14px;">
-        <div class="profile-nav-tabs" style="margin-bottom: 4px;">
-          <button class="profile-tab-btn active" id="fb-tab-btn-auth">Giriş Yap</button>
-          <button class="profile-tab-btn" id="fb-tab-btn-register">Hesap Oluştur</button>
-        </div>
-
-        <!-- Tab 1: Sign In -->
-        <div id="fb-pane-signin" style="display: flex; flex-direction: column; gap: 12px;">
-          <p style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin: 0;">Müziğini, çalma listelerini ve arkadaşlarını senkronize etmek için Raser hesabına giriş yap.</p>
-          <input type="email" id="fb-input-email" class="pill-text-input" placeholder="E-posta adresi" autocomplete="email">
-          <input type="password" id="fb-input-password" class="pill-text-input" placeholder="Şifre" autocomplete="current-password">
-          <button type="button" class="btn-pill-primary" id="btn-fb-signin" style="width: 100%; height: 42px; font-weight: 700;">Giriş Yap</button>
-        </div>
-
-        <!-- Tab 2: Register & Onboarding -->
-        <div id="fb-pane-register" class="hidden" style="display: flex; flex-direction: column; gap: 12px;">
-          <p style="font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin: 0;">Kendine özel bir profil oluştur, müzik zevkini belirle ve Raser dünyasına katıl.</p>
-          
-          <div style="display: flex; gap: 8px;">
-            <input type="text" id="reg-input-display-name" class="pill-text-input" placeholder="Görünen Adın (örn: Hamza)" style="flex: 1;">
-            <input type="text" id="reg-input-username" class="pill-text-input" placeholder="Kullanıcı Adı (örn: hamza)" style="flex: 1;">
-          </div>
-          <input type="email" id="reg-input-email" class="pill-text-input" placeholder="E-posta adresi" autocomplete="email">
-          <input type="password" id="reg-input-password" class="pill-text-input" placeholder="Şifre (en az 6 karakter)" autocomplete="new-password">
-
-          <!-- Spotify-Style Artist Selection & Search -->
-          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-size: 13px; font-weight: 700; color: var(--md-sys-color-on-surface);">Sevdiğin Sanatçıları Seç:</span>
-              <span id="reg-artists-count-badge" style="font-size: 11px; font-weight: 600; color: var(--md-sys-color-primary); background: color-mix(in srgb, var(--md-sys-color-primary) 16%, transparent); padding: 2px 8px; border-radius: 10px;">0 seçildi</span>
-            </div>
-
-            <!-- Artist Search Input -->
-            <div style="position: relative;">
-              <input type="text" id="reg-artist-search" class="pill-text-input" placeholder="Sanatçı ara... (örn: Motive, Ezhel, Travis Scott)" autocomplete="off" style="font-size: 12px; height: 36px; padding-left: 32px; border-radius: 18px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position: absolute; left: 12px; top: 11px; color: var(--md-sys-color-outline); pointer-events: none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            </div>
-
-            <!-- Artists Grid (Recommended & Searched) -->
-            <div id="reg-artists-grid" class="reg-artists-grid"></div>
-          </div>
-
-          <!-- Avatar Selection -->
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            <span style="font-size: 12px; font-weight: 700; color: var(--md-sys-color-on-surface);">Profil Avatarı Seç:</span>
-            <div id="reg-avatar-choices" style="display: flex; gap: 10px; align-items: center;"></div>
-          </div>
-
-          <button type="button" class="btn-pill-primary" id="btn-fb-register" style="width: 100%; height: 42px; font-weight: 700; margin-top: 6px;">Kayıt Ol ve Başla</button>
-        </div>
-
-        <div id="fb-auth-status" class="hidden" style="font-size: 12px; text-align: center; padding: 4px 0;"></div>
-      </div>
-
-      <div class="dialog-actions" style="margin-top: 14px; display: flex; justify-content: space-between; align-items: center;">
-        <button type="button" class="btn-text" id="btn-guest-mode" style="font-size: 12px; color: var(--md-sys-color-outline); cursor: pointer; text-decoration: underline;">Şimdilik Misafir Olarak Devam Et</button>
-        <button type="button" class="btn-outline-pill" id="btn-cancel-firebase-modal">Kapat</button>
       </div>
     </div>
   </div>
