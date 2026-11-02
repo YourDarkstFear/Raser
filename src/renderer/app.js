@@ -12996,16 +12996,54 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
   }
 
   function renderPlaylistsList() {
+    const sidebarPlScroll = document.getElementById('sidebar-playlists-scroll');
+    const sidebarPlContainer = document.getElementById('sidebar-playlists-container');
+
+    // Sidebar Playlists (Spotify-style in nav rail)
+    if (sidebarPlContainer) {
+      sidebarPlContainer.innerHTML = '';
+      if (!state.playlists || state.playlists.length === 0) {
+        if (sidebarPlScroll) sidebarPlScroll.style.display = 'none';
+      } else {
+        if (sidebarPlScroll) sidebarPlScroll.style.display = 'flex';
+        state.playlists.forEach(pl => {
+          const btn = document.createElement('button');
+          btn.className = 'sidebar-pl-btn' + (state.currentView === 'playlist-detail' && state.currentPlaylistId === pl.id ? ' active' : '');
+          btn.title = pl.name || 'Playlist';
+
+          const thumbSrc = (pl && pl.cover) ? proxiedThumb(pl.cover) : ((pl.tracks && pl.tracks[0]) ? getTrackThumbUrl(pl.tracks[0]) : '');
+          if (thumbSrc) {
+            btn.innerHTML = `<img class="sidebar-pl-thumb" src="${escapeHtml(thumbSrc)}" alt="" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'sidebar-pl-fallback\\'>🎵</div>';">`;
+          } else {
+            btn.innerHTML = `<div class="sidebar-pl-fallback"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>`;
+          }
+
+          btn.addEventListener('click', () => {
+            openPlaylistDetail(pl.id);
+          });
+          btn.addEventListener('contextmenu', async (e) => {
+            e.preventDefault();
+            if (window.electronAPI && window.electronAPI.showPlaylistContextMenu) {
+              const act = await window.electronAPI.showPlaylistContextMenu(pl.id);
+              if (act === 'export') {
+                exportSinglePlaylist(pl.id);
+              }
+            }
+          });
+
+          sidebarPlContainer.appendChild(btn);
+        });
+      }
+    }
+
+    // Drawer Playlists
     if (!el.playlistsList) return;
     el.playlistsList.innerHTML = '';
     if (!state.playlists || state.playlists.length === 0) {
-      const emptyMsg = document.createElement('div');
-      emptyMsg.className = 'playlists-empty-note';
-      emptyMsg.style.cssText = 'padding: 24px 12px; text-align: center; color: var(--md-sys-color-on-surface-variant); font-size: calc(13px * var(--font-scale, 1));';
-      emptyMsg.textContent = 'No playlists yet';
-      el.playlistsList.appendChild(emptyMsg);
+      // User explicitly requested: no placeholder text when empty
       return;
     }
+
     state.playlists.forEach(pl => {
       const item = document.createElement('div');
       item.className = 'playlist-item';
@@ -13365,12 +13403,24 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
 
   function createPlaylist(name, initialTracks = [], cover = '') {
     if (!name || !name.trim()) return;
+    const activeProfile = window.RaserAccount ? window.RaserAccount.getActiveProfile() : null;
+    const currentUser = window.RaserFirebase ? window.RaserFirebase.getCurrentUser() : null;
+    const creatorName = activeProfile ? (activeProfile.displayName || activeProfile.username) : (currentUser ? (currentUser.displayName || currentUser.email.split('@')[0]) : 'Raser');
+    const creatorAvatar = activeProfile && activeProfile.avatar ? activeProfile.avatar : (window.RaserAccount ? window.RaserAccount.DEFAULT_AVATARS[0] : '');
+
     const newPl = {
       id: 'pl_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       name: name.trim(),
       tracks: Array.isArray(initialTracks)
         ? initialTracks.map(t => (t && typeof t.addedAt === 'number') ? t : stampAddedAt(t))
-        : []
+        : [],
+      createdBy: {
+        name: creatorName,
+        avatar: creatorAvatar,
+        username: activeProfile ? activeProfile.username : 'user',
+        uid: currentUser ? currentUser.uid : (activeProfile ? activeProfile.id : 'local')
+      },
+      createdAt: Date.now()
     };
     if (cover && typeof cover === 'string' && cover.trim()) {
       newPl.cover = cover.trim();
@@ -13390,6 +13440,28 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
     if (!pl) return;
     state.currentPlaylistId = playlistId;
     state.currentPlaylist = pl;
+
+    // Spotify-style Playlist Creator Row
+    const creatorAvatar = document.getElementById('playlist-creator-avatar');
+    const creatorName = document.getElementById('playlist-creator-name');
+    const activeProfile = window.RaserAccount ? window.RaserAccount.getActiveProfile() : null;
+    const currentUser = window.RaserFirebase ? window.RaserFirebase.getCurrentUser() : null;
+
+    const cInfo = pl.createdBy || {
+      name: activeProfile ? (activeProfile.displayName || activeProfile.username) : (currentUser ? (currentUser.displayName || currentUser.email.split('@')[0]) : 'Raser'),
+      avatar: activeProfile && activeProfile.avatar ? activeProfile.avatar : (window.RaserAccount ? window.RaserAccount.DEFAULT_AVATARS[0] : ''),
+      username: activeProfile ? activeProfile.username : 'user'
+    };
+
+    if (creatorAvatar) {
+      creatorAvatar.src = cInfo.avatar || (window.RaserAccount ? window.RaserAccount.DEFAULT_AVATARS[0] : '');
+      creatorAvatar.onclick = () => switchView('profile');
+    }
+    if (creatorName) {
+      creatorName.textContent = cInfo.name || 'Kullanıcı';
+      creatorName.onclick = () => switchView('profile');
+    }
+
     if (el.playlistDetailTitle) {
       el.playlistDetailTitle.textContent = pl.name || 'Untitled';
       el.playlistDetailTitle.contentEditable = 'plaintext-only';
