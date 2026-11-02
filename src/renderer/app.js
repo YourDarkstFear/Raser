@@ -27067,6 +27067,11 @@ function bindCoverHoldZoom(wrapEl) {
     if (userProfilePill && userProfileDropdown) {
       userProfilePill.addEventListener('click', (e) => {
         e.stopPropagation();
+        const isAuthed = !!(window.RaserFirebase && window.RaserFirebase.getCurrentUser());
+        if (!isAuthed) {
+          switchView('auth');
+          return;
+        }
         const isOpen = !userProfileDropdown.classList.contains('hidden');
         if (isOpen) {
           userProfileDropdown.classList.add('hidden');
@@ -27122,7 +27127,7 @@ function bindCoverHoldZoom(wrapEl) {
     if (btnMenuEditProfile) {
       btnMenuEditProfile.addEventListener('click', () => {
         closeDropdown();
-        openEditProfileModal();
+        switchView('edit-profile');
       });
     }
 
@@ -27154,9 +27159,9 @@ function bindCoverHoldZoom(wrapEl) {
 
     // Profile View Actions
     const btnHeroEditModal = document.getElementById('btn-profile-edit-modal');
-    if (btnHeroEditModal) btnHeroEditModal.addEventListener('click', openEditProfileModal);
+    if (btnHeroEditModal) btnHeroEditModal.addEventListener('click', () => switchView('edit-profile'));
     const btnHeroAvatarEdit = document.getElementById('btn-edit-profile-avatar');
-    if (btnHeroAvatarEdit) btnHeroAvatarEdit.addEventListener('click', openEditProfileModal);
+    if (btnHeroAvatarEdit) btnHeroAvatarEdit.addEventListener('click', () => switchView('edit-profile'));
 
     const btnHeroAddFriend = document.getElementById('btn-profile-add-friend');
     if (btnHeroAddFriend) btnHeroAddFriend.addEventListener('click', openAddFriendModal);
@@ -27380,43 +27385,39 @@ function bindCoverHoldZoom(wrapEl) {
       });
     }
 
-    // Modal: Raser Account & Auth
-    const modalFirebase = document.getElementById('modal-firebase-connect');
-    const btnCloseFirebaseModal = document.getElementById('btn-close-firebase-modal');
-    const btnCancelFirebaseModal = document.getElementById('btn-cancel-firebase-modal');
-    const btnMenuFirebase = document.getElementById('btn-menu-firebase');
-    const btnProfileCloudSync = document.getElementById('btn-profile-cloud-sync');
-    const btnGuestMode = document.getElementById('btn-guest-mode');
+    // Full-Page: Raser Account & Auth Controller
+    const btnBackAuth = document.getElementById('btn-back-auth');
+    if (btnBackAuth) {
+      btnBackAuth.addEventListener('click', () => switchView(state.previousView || 'profile'));
+    }
 
-    const fbTabBtnAuth = document.getElementById('fb-tab-btn-auth');
-    const fbTabBtnRegister = document.getElementById('fb-tab-btn-register');
-    const fbPaneSignin = document.getElementById('fb-pane-signin');
-    const fbPaneRegister = document.getElementById('fb-pane-register');
-    const raserAuthContainer = document.getElementById('raser-auth-container');
+    const authTabBtnSignin = document.getElementById('auth-tab-btn-signin');
+    const authTabBtnRegister = document.getElementById('auth-tab-btn-register');
+    const authPaneSignin = document.getElementById('auth-pane-signin');
+    const authPaneRegister = document.getElementById('auth-pane-register');
+    const authLoggedInBox = document.getElementById('auth-logged-in-box');
+    const authFormContainer = document.getElementById('auth-form-container');
+    const authStatusMsg = document.getElementById('auth-status-msg');
 
-    const fbLoggedInBox = document.getElementById('firebase-logged-in-box');
-    const fbUserEmail = document.getElementById('firebase-user-email');
-    const raserActiveUserAvatar = document.getElementById('raser-active-user-avatar');
-    const raserActiveUserName = document.getElementById('raser-active-user-name');
-    const btnFbLogout = document.getElementById('btn-firebase-logout');
+    const authInputEmail = document.getElementById('auth-input-email');
+    const authInputPassword = document.getElementById('auth-input-password');
+    const btnAuthSignin = document.getElementById('btn-auth-signin');
 
-    const inputFbEmail = document.getElementById('fb-input-email');
-    const inputFbPassword = document.getElementById('fb-input-password');
-    const btnFbSignin = document.getElementById('btn-fb-signin');
+    const authRegName = document.getElementById('auth-reg-name');
+    const authRegUsername = document.getElementById('auth-reg-username');
+    const authRegEmail = document.getElementById('auth-reg-email');
+    const authRegPassword = document.getElementById('auth-reg-password');
+    const authArtistSearch = document.getElementById('auth-artist-search');
+    const authArtistsGrid = document.getElementById('auth-artists-grid');
+    const authArtistsCountBadge = document.getElementById('auth-artists-count-badge');
+    const authAvatarChoices = document.getElementById('auth-avatar-choices');
+    const btnAuthRegister = document.getElementById('btn-auth-register');
 
-    const regInputDisplayName = document.getElementById('reg-input-display-name');
-    const regInputUsername = document.getElementById('reg-input-username');
-    const regInputEmail = document.getElementById('reg-input-email');
-    const regInputPassword = document.getElementById('reg-input-password');
-    const regArtistSearch = document.getElementById('reg-artist-search');
-    const regArtistsGrid = document.getElementById('reg-artists-grid');
-    const regArtistsCountBadge = document.getElementById('reg-artists-count-badge');
-    const regAvatarChoices = document.getElementById('reg-avatar-choices');
-    const btnFbRegister = document.getElementById('btn-fb-register');
-    const fbAuthStatus = document.getElementById('fb-auth-status');
+    const btnAuthGotoProfile = document.getElementById('btn-auth-goto-profile');
+    const btnAuthLogout = document.getElementById('btn-auth-logout');
 
-    let regSelectedAvatar = window.RaserAccount.DEFAULT_AVATARS[0];
-    const selectedArtists = new Map();
+    let authSelectedAvatar = window.RaserAccount.DEFAULT_AVATARS[0];
+    const authSelectedArtists = new Map();
 
     const RECOMMENDED_ONBOARDING_ARTISTS = [
       { name: 'Motive', image: 'https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg' },
@@ -27437,21 +27438,18 @@ function bindCoverHoldZoom(wrapEl) {
       { name: 'Kendrick Lamar', image: 'https://cdn-images.dzcdn.net/images/artist/9166f3661eb1a478b006bcfa7e5ec8f6/250x250-000000-80-0-0.jpg' }
     ];
 
-    // Pre-select Motive as favorite default
-    selectedArtists.set('Motive', RECOMMENDED_ONBOARDING_ARTISTS[0]);
-
-    function renderArtistGrid(artistList) {
-      if (!regArtistsGrid) return;
-      regArtistsGrid.innerHTML = '';
+    function renderAuthArtistGrid(artistList) {
+      if (!authArtistsGrid) return;
+      authArtistsGrid.innerHTML = '';
 
       if (!artistList || artistList.length === 0) {
-        regArtistsGrid.innerHTML = '<div style="grid-column: 1 / -1; font-size: 12px; color: var(--md-sys-color-outline); padding: 18px 0; text-align: center;">Sanatçı bulunamadı. Farklı bir arama deneyebilirsin.</div>';
+        authArtistsGrid.innerHTML = '<div style="grid-column: 1 / -1; font-size: 12px; color: var(--md-sys-color-outline); padding: 18px 0; text-align: center;">Sanatçı bulunamadı.</div>';
         return;
       }
 
       artistList.forEach(art => {
         const item = document.createElement('div');
-        item.className = 'reg-artist-item' + (selectedArtists.has(art.name) ? ' selected' : '');
+        item.className = 'reg-artist-item' + (authSelectedArtists.has(art.name) ? ' selected' : '');
         item.innerHTML = `
           <div class="reg-artist-avatar-wrap">
             <img src="${escapeHtml(art.image || 'https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg')}" alt="${escapeHtml(art.name)}" loading="lazy" onerror="this.onerror=null; this.src='https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent('${escapeHtml(art.name)}');">
@@ -27461,68 +27459,64 @@ function bindCoverHoldZoom(wrapEl) {
         `;
 
         item.onclick = () => {
-          if (selectedArtists.has(art.name)) {
-            selectedArtists.delete(art.name);
+          if (authSelectedArtists.has(art.name)) {
+            authSelectedArtists.delete(art.name);
             item.classList.remove('selected');
           } else {
-            selectedArtists.set(art.name, art);
+            authSelectedArtists.set(art.name, art);
             item.classList.add('selected');
           }
-          if (regArtistsCountBadge) {
-            regArtistsCountBadge.textContent = `${selectedArtists.size} seçildi`;
+          if (authArtistsCountBadge) {
+            authArtistsCountBadge.textContent = `${authSelectedArtists.size} seçildi`;
           }
         };
 
-        regArtistsGrid.appendChild(item);
+        authArtistsGrid.appendChild(item);
       });
 
-      if (regArtistsCountBadge) {
-        regArtistsCountBadge.textContent = `${selectedArtists.size} seçildi`;
+      if (authArtistsCountBadge) {
+        authArtistsCountBadge.textContent = `${authSelectedArtists.size} seçildi`;
       }
     }
 
-    let artistSearchDebounceTimer = null;
-    function setupArtistSearch() {
-      renderArtistGrid(RECOMMENDED_ONBOARDING_ARTISTS);
+    let authSearchDebounceTimer = null;
+    function setupAuthArtistSearch() {
+      renderAuthArtistGrid(RECOMMENDED_ONBOARDING_ARTISTS);
 
-      if (regArtistSearch) {
-        regArtistSearch.addEventListener('input', () => {
-          clearTimeout(artistSearchDebounceTimer);
-          const q = regArtistSearch.value.trim();
+      if (authArtistSearch) {
+        authArtistSearch.addEventListener('input', () => {
+          clearTimeout(authSearchDebounceTimer);
+          const q = authArtistSearch.value.trim();
 
           if (!q) {
-            renderArtistGrid(RECOMMENDED_ONBOARDING_ARTISTS);
+            renderAuthArtistGrid(RECOMMENDED_ONBOARDING_ARTISTS);
             return;
           }
 
-          // Filter local list first
           const localMatches = RECOMMENDED_ONBOARDING_ARTISTS.filter(a => a.name.toLowerCase().includes(q.toLowerCase()));
-          if (localMatches.length > 0) {
-            renderArtistGrid(localMatches);
-          }
+          if (localMatches.length > 0) renderAuthArtistGrid(localMatches);
 
-          // Search server for live artists
-          artistSearchDebounceTimer = setTimeout(async () => {
+          authSearchDebounceTimer = setTimeout(async () => {
             try {
               const res = await fetch('/api/search?q=' + encodeURIComponent(q) + '&t=' + Date.now());
               if (!res.ok) return;
               const data = await res.json();
               const items = Array.isArray(data) ? data : (data.results || []);
 
-              const discoveredArtists = new Map();
-              localMatches.forEach(m => discoveredArtists.set(m.name, m));
+              const discovered = new Map();
+              localMatches.forEach(m => discovered.set(m.name, m));
 
               items.forEach(t => {
-                if (t.artist && !discoveredArtists.has(t.artist)) {
-                  discoveredArtists.set(t.artist, {
+                if (t.artist && !discovered.has(t.artist)) {
+                  discovered.set(t.artist, {
                     name: t.artist,
                     image: t.thumbnail || 'https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg'
                   });
                 }
               });
 
-              if (regArtistSearch.value.trim() === q && discoveredArtists.size > 0) {
-                renderArtistGrid(Array.from(discoveredArtists.values()).slice(0, 16));
+              if (authArtistSearch.value.trim() === q && discovered.size > 0) {
+                renderAuthArtistGrid(Array.from(discovered.values()).slice(0, 16));
               }
             } catch (_) {}
           }, 280);
@@ -27530,24 +27524,248 @@ function bindCoverHoldZoom(wrapEl) {
       }
     }
 
-    function setupAvatarChoices() {
-      if (!regAvatarChoices) return;
-      regAvatarChoices.innerHTML = '';
+    function setupAuthAvatarChoices() {
+      if (!authAvatarChoices) return;
+      authAvatarChoices.innerHTML = '';
       window.RaserAccount.DEFAULT_AVATARS.forEach(av => {
         const img = document.createElement('img');
         img.src = av;
-        img.style.cssText = 'width: 36px; height: 36px; border-radius: 50%; cursor: pointer; border: 2px solid ' + (av === regSelectedAvatar ? 'var(--md-sys-color-primary)' : 'transparent') + '; transition: transform 0.2s ease;';
+        img.style.cssText = 'width: 40px; height: 40px; border-radius: 50%; cursor: pointer; border: 2px solid ' + (av === authSelectedAvatar ? 'var(--md-sys-color-primary)' : 'transparent') + '; transition: transform 0.2s ease;';
         img.onclick = () => {
-          regSelectedAvatar = av;
-          Array.from(regAvatarChoices.children).forEach(c => c.style.borderColor = 'transparent');
+          authSelectedAvatar = av;
+          Array.from(authAvatarChoices.children).forEach(c => c.style.borderColor = 'transparent');
           img.style.borderColor = 'var(--md-sys-color-primary)';
         };
-        regAvatarChoices.appendChild(img);
+        authAvatarChoices.appendChild(img);
       });
     }
 
-    setupArtistSearch();
-    setupAvatarChoices();
+    setupAuthArtistSearch();
+    setupAuthAvatarChoices();
+
+    if (authTabBtnSignin && authTabBtnRegister) {
+      authTabBtnSignin.addEventListener('click', () => {
+        authTabBtnSignin.classList.add('active');
+        authTabBtnRegister.classList.remove('active');
+        if (authPaneSignin) authPaneSignin.classList.remove('hidden');
+        if (authPaneRegister) authPaneRegister.classList.add('hidden');
+        if (authStatusMsg) authStatusMsg.classList.add('hidden');
+      });
+      authTabBtnRegister.addEventListener('click', () => {
+        authTabBtnRegister.classList.add('active');
+        authTabBtnSignin.classList.remove('active');
+        if (authPaneRegister) authPaneRegister.classList.remove('hidden');
+        if (authPaneSignin) authPaneSignin.classList.add('hidden');
+        if (authStatusMsg) authStatusMsg.classList.add('hidden');
+      });
+    }
+
+    if (btnAuthSignin) {
+      btnAuthSignin.addEventListener('click', async () => {
+        const email = authInputEmail ? authInputEmail.value.trim() : '';
+        const pass = authInputPassword ? authInputPassword.value : '';
+        if (!email || !pass) {
+          if (authStatusMsg) {
+            authStatusMsg.classList.remove('hidden');
+            authStatusMsg.style.color = '#ff6b6b';
+            authStatusMsg.textContent = 'Lütfen e-posta ve şifrenizi girin.';
+          }
+          return;
+        }
+        btnAuthSignin.disabled = true;
+        btnAuthSignin.textContent = 'Giriş yapılıyor...';
+        const res = await window.RaserFirebase.loginWithEmail(email, pass);
+        btnAuthSignin.disabled = false;
+        btnAuthSignin.textContent = 'Giriş Yap';
+
+        if (res.success) {
+          showToast('Raser hesabına hoş geldin!');
+          updateTopNavUI();
+          updateCloudStatusUI();
+          switchView('profile');
+        } else {
+          if (authStatusMsg) {
+            authStatusMsg.classList.remove('hidden');
+            authStatusMsg.style.color = '#ff6b6b';
+            authStatusMsg.textContent = res.message || 'Giriş yapılamadı.';
+          }
+        }
+      });
+    }
+
+    if (btnAuthRegister) {
+      btnAuthRegister.addEventListener('click', async () => {
+        const dName = authRegName ? authRegName.value.trim() : '';
+        const uName = authRegUsername ? authRegUsername.value.trim() : '';
+        const email = authRegEmail ? authRegEmail.value.trim() : '';
+        const pass = authRegPassword ? authRegPassword.value : '';
+
+        if (!email || !pass || pass.length < 6) {
+          if (authStatusMsg) {
+            authStatusMsg.classList.remove('hidden');
+            authStatusMsg.style.color = '#ff6b6b';
+            authStatusMsg.textContent = 'Lütfen geçerli bir e-posta ve en az 6 haneli şifre girin.';
+          }
+          return;
+        }
+
+        const chosen = Array.from(authSelectedArtists.keys());
+        btnAuthRegister.disabled = true;
+        btnAuthRegister.textContent = 'Hesap oluşturuluyor...';
+        const res = await window.RaserFirebase.registerWithEmail(
+          email,
+          pass,
+          dName || 'Müziksever',
+          uName || 'user',
+          ['Hip-Hop', 'Rap', 'Turkish Trap'],
+          authSelectedAvatar,
+          chosen
+        );
+        btnAuthRegister.disabled = false;
+        btnAuthRegister.textContent = 'Kayıt Ol ve Başla';
+
+        if (res.success) {
+          showToast('Raser hesabın oluşturuldu! Keyifli dinlemeler.');
+          updateTopNavUI();
+          updateCloudStatusUI();
+          switchView('profile');
+        } else {
+          if (authStatusMsg) {
+            authStatusMsg.classList.remove('hidden');
+            authStatusMsg.style.color = '#ff6b6b';
+            authStatusMsg.textContent = res.message || 'Kayıt işlemi başarısız oldu.';
+          }
+        }
+      });
+    }
+
+    if (btnAuthLogout) {
+      btnAuthLogout.addEventListener('click', async () => {
+        if (window.RaserFirebase) await window.RaserFirebase.logout();
+        showToast('Oturum kapatıldı.');
+        updateTopNavUI();
+        updateCloudStatusUI();
+        renderAuthView();
+      });
+    }
+
+    if (btnAuthGotoProfile) {
+      btnAuthGotoProfile.addEventListener('click', () => switchView('profile'));
+    }
+
+    function renderAuthView() {
+      const user = window.RaserFirebase ? window.RaserFirebase.getCurrentUser() : null;
+      const profile = window.RaserAccount ? window.RaserAccount.getActiveProfile() : null;
+
+      if (user) {
+        if (authLoggedInBox) authLoggedInBox.classList.remove('hidden');
+        if (authFormContainer) authFormContainer.classList.add('hidden');
+        const av = document.getElementById('auth-user-avatar');
+        const nm = document.getElementById('auth-user-name');
+        const em = document.getElementById('auth-user-email');
+        if (av) av.src = profile && profile.avatar ? profile.avatar : window.RaserAccount.DEFAULT_AVATARS[0];
+        if (nm) nm.textContent = profile ? (profile.displayName || profile.username) : (user.displayName || 'Kullanıcı');
+        if (em) em.textContent = user.email || '';
+      } else {
+        if (authLoggedInBox) authLoggedInBox.classList.add('hidden');
+        if (authFormContainer) authFormContainer.classList.remove('hidden');
+      }
+      if (authStatusMsg) {
+        authStatusMsg.classList.add('hidden');
+        authStatusMsg.textContent = '';
+      }
+    }
+
+    // Full-Page: Edit Profile Controller
+    const btnBackEditProfile = document.getElementById('btn-back-edit-profile');
+    if (btnBackEditProfile) {
+      btnBackEditProfile.addEventListener('click', () => switchView('profile'));
+    }
+
+    let editPageSelectedAvatar = window.RaserAccount.DEFAULT_AVATARS[0];
+    function renderEditProfileView() {
+      const p = window.RaserAccount ? window.RaserAccount.getActiveProfile() : null;
+      if (!p) return;
+
+      const nameInp = document.getElementById('edit-page-name');
+      const userInp = document.getElementById('edit-page-username');
+      const bioInp = document.getElementById('edit-page-bio');
+      const genresInp = document.getElementById('edit-page-genres');
+      const avPrev = document.getElementById('edit-page-avatar-preview');
+      const choicesBox = document.getElementById('edit-page-avatar-choices');
+
+      if (nameInp) nameInp.value = p.displayName || '';
+      if (userInp) userInp.value = p.username || '';
+      if (bioInp) bioInp.value = p.bio || '';
+      if (genresInp) genresInp.value = (p.genres || []).join(', ');
+
+      editPageSelectedAvatar = p.avatar || window.RaserAccount.DEFAULT_AVATARS[0];
+      if (avPrev) avPrev.src = editPageSelectedAvatar;
+
+      if (choicesBox) {
+        choicesBox.innerHTML = '';
+        window.RaserAccount.DEFAULT_AVATARS.forEach(av => {
+          const item = document.createElement('img');
+          item.src = av;
+          item.style.cssText = 'width: 36px; height: 36px; border-radius: 50%; cursor: pointer; border: 2px solid ' + (av === editPageSelectedAvatar ? 'var(--md-sys-color-primary)' : 'transparent') + '; transition: transform 0.2s ease;';
+          item.addEventListener('click', () => {
+            editPageSelectedAvatar = av;
+            if (avPrev) avPrev.src = av;
+            Array.from(choicesBox.children).forEach(c => c.style.borderColor = 'transparent');
+            item.style.borderColor = 'var(--md-sys-color-primary)';
+          });
+          choicesBox.appendChild(item);
+        });
+      }
+    }
+
+    const btnSavePageProfile = document.getElementById('btn-save-page-profile');
+    const btnCancelPageProfile = document.getElementById('btn-cancel-page-profile');
+
+    if (btnCancelPageProfile) {
+      btnCancelPageProfile.addEventListener('click', () => switchView('profile'));
+    }
+
+    if (btnSavePageProfile) {
+      btnSavePageProfile.addEventListener('click', () => {
+        const dName = document.getElementById('edit-page-name') ? document.getElementById('edit-page-name').value.trim() : '';
+        const uName = document.getElementById('edit-page-username') ? document.getElementById('edit-page-username').value.trim() : '';
+        const bio = document.getElementById('edit-page-bio') ? document.getElementById('edit-page-bio').value.trim() : '';
+        const genresRaw = document.getElementById('edit-page-genres') ? document.getElementById('edit-page-genres').value : '';
+        const genres = genresRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+        const updated = window.RaserAccount.updateProfile({
+          displayName: dName || 'Kullanıcı',
+          username: uName || 'user',
+          bio: bio,
+          genres: genres,
+          avatar: editPageSelectedAvatar
+        });
+
+        if (window.RaserFirebase && window.RaserFirebase.getCurrentUser()) {
+          window.RaserFirebase.syncProfileToCloud(updated);
+        }
+
+        showToast('Profilin başarıyla güncellendi!');
+        updateTopNavUI();
+        switchView('profile');
+      });
+    }
+
+    // Top bar and button triggers -> Full page routing
+
+    const btnProfileCloudSync = document.getElementById('btn-profile-cloud-sync');
+    if (btnProfileCloudSync) {
+      btnProfileCloudSync.addEventListener('click', () => switchView('auth'));
+    }
+    const btnMenuFirebase = document.getElementById('btn-menu-firebase');
+    if (btnMenuFirebase) {
+      btnMenuFirebase.addEventListener('click', () => {
+        if (typeof closeDropdown === 'function') closeDropdown();
+        switchView('auth');
+      });
+    }
+
 
     function updateCloudStatusUI() {
       const profileCloudBadge = document.getElementById('profile-cloud-badge');
@@ -27563,167 +27781,16 @@ function bindCoverHoldZoom(wrapEl) {
         if (menuLabel) menuLabel.textContent = 'Hesap: ' + (user.displayName || user.email ? (user.displayName || user.email.split('@')[0]) : 'Profil');
       } else {
         if (profileCloudBadge) {
-          profileCloudBadge.textContent = '⚪ Yerel Profil';
+          profileCloudBadge.textContent = '⚪ Giriş Yapılmadı';
           profileCloudBadge.classList.remove('connected');
           profileCloudBadge.title = 'Giriş yaparak müziklerini ve arkadaşlarını senkronize et';
         }
-        if (menuLabel) menuLabel.textContent = 'Raser Hesabı';
+        if (menuLabel) menuLabel.textContent = 'Giriş Yap / Kayıt Ol';
       }
-    }
-
-    function openFirebaseModal(defaultTab = 'signin') {
-      if (!modalFirebase) return;
-      if (typeof closeDropdown === 'function') closeDropdown();
-
-      const user = window.RaserFirebase ? window.RaserFirebase.getCurrentUser() : null;
-      const profile = window.RaserAccount ? window.RaserAccount.getActiveProfile() : null;
-
-      if (user) {
-        if (fbLoggedInBox) fbLoggedInBox.classList.remove('hidden');
-        if (raserAuthContainer) raserAuthContainer.classList.add('hidden');
-        if (fbUserEmail) fbUserEmail.textContent = user.email || user.uid;
-        if (raserActiveUserName) raserActiveUserName.textContent = profile ? (profile.displayName || profile.username) : (user.displayName || 'Raser Kullanıcısı');
-        if (raserActiveUserAvatar) raserActiveUserAvatar.src = profile && profile.avatar ? profile.avatar : window.RaserAccount.DEFAULT_AVATARS[0];
-      } else {
-        if (fbLoggedInBox) fbLoggedInBox.classList.add('hidden');
-        if (raserAuthContainer) raserAuthContainer.classList.remove('hidden');
-
-        if (defaultTab === 'register' && fbTabBtnRegister) {
-          fbTabBtnRegister.click();
-        } else if (fbTabBtnAuth) {
-          fbTabBtnAuth.click();
-        }
-      }
-
-      if (fbAuthStatus) {
-        fbAuthStatus.classList.add('hidden');
-        fbAuthStatus.textContent = '';
-      }
-
-      openModal(modalFirebase);
-    }
-
-    if (btnMenuFirebase) btnMenuFirebase.addEventListener('click', () => openFirebaseModal('signin'));
-    if (btnProfileCloudSync) btnProfileCloudSync.addEventListener('click', () => openFirebaseModal('signin'));
-    const profileCloudBadgeEl = document.getElementById('profile-cloud-badge');
-    if (profileCloudBadgeEl) profileCloudBadgeEl.addEventListener('click', () => openFirebaseModal('signin'));
-
-    if (btnCloseFirebaseModal) btnCloseFirebaseModal.addEventListener('click', () => closeModal(modalFirebase));
-    if (btnCancelFirebaseModal) btnCancelFirebaseModal.addEventListener('click', () => closeModal(modalFirebase));
-    if (btnGuestMode) {
-      btnGuestMode.addEventListener('click', () => {
-        closeModal(modalFirebase);
-        showToast('Misafir modundasın. Dilediğin zaman Raser Hesabı açabilirsin.');
-      });
-    }
-
-    if (fbTabBtnAuth && fbTabBtnRegister) {
-      fbTabBtnAuth.addEventListener('click', () => {
-        fbTabBtnAuth.classList.add('active');
-        fbTabBtnRegister.classList.remove('active');
-        if (fbPaneSignin) fbPaneSignin.classList.remove('hidden');
-        if (fbPaneRegister) fbPaneRegister.classList.add('hidden');
-        if (fbAuthStatus) fbAuthStatus.classList.add('hidden');
-      });
-      fbTabBtnRegister.addEventListener('click', () => {
-        fbTabBtnRegister.classList.add('active');
-        fbTabBtnAuth.classList.remove('active');
-        if (fbPaneRegister) fbPaneRegister.classList.remove('hidden');
-        if (fbPaneSignin) fbPaneSignin.classList.add('hidden');
-        if (fbAuthStatus) fbAuthStatus.classList.add('hidden');
-      });
-    }
-
-    if (btnFbSignin) {
-      btnFbSignin.addEventListener('click', async () => {
-        const email = inputFbEmail ? inputFbEmail.value.trim() : '';
-        const pass = inputFbPassword ? inputFbPassword.value : '';
-        if (!email || !pass) {
-          if (fbAuthStatus) {
-            fbAuthStatus.classList.remove('hidden');
-            fbAuthStatus.style.color = '#ff6b6b';
-            fbAuthStatus.textContent = 'Lütfen e-posta ve şifreni gir.';
-          }
-          return;
-        }
-        btnFbSignin.disabled = true;
-        btnFbSignin.textContent = 'Giriş yapılıyor...';
-        const res = await window.RaserFirebase.loginWithEmail(email, pass);
-        btnFbSignin.disabled = false;
-        btnFbSignin.textContent = 'Giriş Yap';
-
-        if (res.success) {
-          showToast('Raser hesabına hoş geldin!');
-          closeModal(modalFirebase);
-          updateCloudStatusUI();
-          if (state.currentView === 'profile') renderProfileView();
-        } else {
-          if (fbAuthStatus) {
-            fbAuthStatus.classList.remove('hidden');
-            fbAuthStatus.style.color = '#ff6b6b';
-            fbAuthStatus.textContent = res.message || 'Giriş yapılamadı.';
-          }
-        }
-      });
-    }
-
-    if (btnFbRegister) {
-      btnFbRegister.addEventListener('click', async () => {
-        const dName = regInputDisplayName ? regInputDisplayName.value.trim() : '';
-        const uName = regInputUsername ? regInputUsername.value.trim() : '';
-        const email = regInputEmail ? regInputEmail.value.trim() : '';
-        const pass = regInputPassword ? regInputPassword.value : '';
-
-        if (!email || !pass || pass.length < 6) {
-          if (fbAuthStatus) {
-            fbAuthStatus.classList.remove('hidden');
-            fbAuthStatus.style.color = '#ff6b6b';
-            fbAuthStatus.textContent = 'Lütfen geçerli bir e-posta ve en az 6 haneli şifre girin.';
-          }
-          return;
-        }
-
-        const chosenArtists = Array.from(selectedArtists.keys());
-        btnFbRegister.disabled = true;
-        btnFbRegister.textContent = 'Hesap oluşturuluyor...';
-        const res = await window.RaserFirebase.registerWithEmail(
-          email,
-          pass,
-          dName || 'Müziksever',
-          uName || 'user',
-          ['Hip-Hop', 'Rap', 'Turkish Trap'],
-          regSelectedAvatar,
-          chosenArtists.length > 0 ? chosenArtists : ['Motive']
-        );
-        btnFbRegister.disabled = false;
-        btnFbRegister.textContent = 'Kayıt Ol ve Başla';
-
-        if (res.success) {
-          showToast('Raser hesabın oluşturuldu! Keyifli dinlemeler.');
-          closeModal(modalFirebase);
-          updateCloudStatusUI();
-          if (state.currentView === 'profile') renderProfileView();
-        } else {
-          if (fbAuthStatus) {
-            fbAuthStatus.classList.remove('hidden');
-            fbAuthStatus.style.color = '#ff6b6b';
-            fbAuthStatus.textContent = res.message || 'Kayıt işlemi başarısız oldu.';
-          }
-        }
-      });
-    }
-
-    if (btnFbLogout) {
-      btnFbLogout.addEventListener('click', async () => {
-        if (window.RaserFirebase) await window.RaserFirebase.logout();
-        showToast('Oturum kapatıldı.');
-        closeModal(modalFirebase);
-        updateCloudStatusUI();
-        if (state.currentView === 'profile') renderProfileView();
-      });
     }
 
     window.addEventListener('raser:firebase-auth-changed', () => {
+      updateTopNavUI();
       updateCloudStatusUI();
       if (state.currentView === 'profile') renderProfileView();
     });
@@ -27890,17 +27957,17 @@ function bindCoverHoldZoom(wrapEl) {
       overviewArtistsEl.innerHTML = '';
       const artistEntries = Object.entries(stats.topArtists || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
       if (artistEntries.length === 0) {
-        overviewArtistsEl.innerHTML = '<div style="font-size: 13px; color: var(--md-sys-color-outline);">Play some songs to build your top artists list!</div>';
+        overviewArtistsEl.innerHTML = '<div style="font-size: 13px; color: var(--md-sys-color-outline); padding: 16px 0;">Henüz dinleme verisi oluşmadı. Müzik çaldıkça en çok dinlediğin sanatçılar burada yer alacak.</div>';
       } else {
         artistEntries.forEach(([artName, count]) => {
           const card = document.createElement('div');
           card.style.cssText = 'display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100px; cursor: pointer; text-align: center;';
           card.innerHTML = `
             <div style="width: 72px; height: 72px; border-radius: 50%; overflow: hidden; background: var(--md-sys-color-surface-container-high); box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
-              <img src="https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg" style="width: 100%; height: 100%; object-fit: cover;">
+              <img src="https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.src='https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent('${escapeHtml(artName)}');">
             </div>
             <span style="font-weight: 700; font-size: 12px; color: var(--md-sys-color-on-surface); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">${escapeHtml(artName)}</span>
-            <span style="font-size: 11px; color: var(--md-sys-color-outline);">${count} plays</span>
+            <span style="font-size: 11px; color: var(--md-sys-color-outline);">${count} dinleme</span>
           `;
           card.addEventListener('click', () => openArtistProfile(artName));
           overviewArtistsEl.appendChild(card);
@@ -27914,7 +27981,7 @@ function bindCoverHoldZoom(wrapEl) {
       overviewTracksEl.innerHTML = '';
       const topT = stats.topTracks || [];
       if (topT.length === 0) {
-        overviewTracksEl.innerHTML = '<div style="font-size: 13px; color: var(--md-sys-color-outline); padding: 12px 0;">No tracks logged yet. Listen to music to view your top tracks.</div>';
+        overviewTracksEl.innerHTML = '<div style="font-size: 13px; color: var(--md-sys-color-outline); padding: 16px 0;">Henüz parça dinlenmedi. Şarkı dinledikçe favorilerin burada sıralanacaktır.</div>';
       } else {
         topT.slice(0, 5).forEach((t, i) => {
           const row = document.createElement('div');
@@ -27925,7 +27992,7 @@ function bindCoverHoldZoom(wrapEl) {
               <span class="track-row-title">${escapeHtml(t.title)}</span>
               <span class="track-row-artist">${escapeHtml(t.artist)}</span>
             </div>
-            <div style="margin-left: auto; font-size: 12px; color: var(--md-sys-color-outline); font-weight: 600;">${t.plays} plays</div>
+            <div style="margin-left: auto; font-size: 12px; color: var(--md-sys-color-outline); font-weight: 600;">${t.plays} dinleme</div>
           `;
           row.addEventListener('click', () => performSearch(t.artist + ' ' + t.title));
           overviewTracksEl.appendChild(row);
@@ -27940,9 +28007,9 @@ function bindCoverHoldZoom(wrapEl) {
     const wArtistList = document.getElementById('wrapped-artist-list');
 
     if (wPlays) wPlays.textContent = String(stats.totalPlays || 0);
-    if (wTime) wTime.textContent = (stats.totalDurationMinutes || 0) + ' mins';
+    if (wTime) wTime.textContent = (stats.totalDurationMinutes || 0) + ' dk';
     const topArtistName = Object.entries(stats.topArtists || {}).sort((a, b) => b[1] - a[1])[0];
-    if (wTopArtist) wTopArtist.textContent = topArtistName ? topArtistName[0] : 'None yet';
+    if (wTopArtist) wTopArtist.textContent = topArtistName ? topArtistName[0] : 'Henüz Yok';
 
     if (wArtistList) {
       wArtistList.innerHTML = '';
@@ -27956,7 +28023,7 @@ function bindCoverHoldZoom(wrapEl) {
         item.innerHTML = `
           <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600;">
             <span style="color: var(--md-sys-color-on-surface);">${idx + 1}. ${escapeHtml(artName)}</span>
-            <span style="color: var(--md-sys-color-outline);">${count} plays</span>
+            <span style="color: var(--md-sys-color-outline);">${count} dinleme</span>
           </div>
           <div style="height: 6px; border-radius: 3px; background: var(--md-sys-color-surface-container); overflow: hidden;">
             <div style="height: 100%; width: ${pct}%; background: var(--md-sys-color-primary); border-radius: 3px;"></div>
@@ -27975,7 +28042,7 @@ function bindCoverHoldZoom(wrapEl) {
     if (friendsGrid) {
       friendsGrid.innerHTML = '';
       if (friends.length === 0) {
-        friendsGrid.innerHTML = '<div style="font-size: 13px; color: var(--md-sys-color-outline);">You are not following anyone yet. Add a friend using their Raser Code!</div>';
+        friendsGrid.innerHTML = '<div style="font-size: 13px; color: var(--md-sys-color-outline); padding: 18px 0;">Henüz kimseyi takip etmiyorsun. Arkadaşının Raser Kodunu (örn: RS-...) ekleyerek ne dinlediğini canlı görebilirsin.</div>';
       } else {
         friends.forEach(f => {
           const card = document.createElement('div');
@@ -27993,7 +28060,7 @@ function bindCoverHoldZoom(wrapEl) {
                 </div>
               ` : ''}
             </div>
-            <button class="btn-outline-pill" style="height: 28px; padding: 0 10px; font-size: 11px;">Listen</button>
+            <button class="btn-outline-pill" style="height: 28px; padding: 0 10px; font-size: 11px;">Dinle</button>
           `;
           card.querySelector('button').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -28011,7 +28078,7 @@ function bindCoverHoldZoom(wrapEl) {
       const notesObj = window.RaserAccount.getTrackNotes();
       const entries = Object.entries(notesObj);
       if (entries.length === 0) {
-        notesContainer.innerHTML = '<div style="font-size: 13px; color: var(--md-sys-color-outline);">No music notes saved yet. Add a personal memory to any song!</div>';
+        notesContainer.innerHTML = '<div style="font-size: 13px; color: var(--md-sys-color-outline); padding: 18px 0;">Henüz bir şarkı notu kaydetmedin. Bir şarkı çalarken not butonuna basarak kişisel anılarını kaydedebilirsin.</div>';
       } else {
         entries.forEach(([cid, noteData]) => {
           const card = document.createElement('div');
