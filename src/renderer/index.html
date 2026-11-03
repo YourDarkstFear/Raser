@@ -96,6 +96,57 @@
         </button>
       </div>
     </div>
+
+    <div class="user-nav-container">
+      <button class="topbar-friend-activity-btn" id="btn-toggle-friend-activity" title="Friend Activity">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+      </button>
+
+      <div class="user-profile-pill" id="user-profile-pill" role="button" tabindex="0">
+        <img class="user-pill-avatar" id="user-pill-avatar" src="" alt="Avatar" />
+        <span class="user-pill-name" id="user-pill-name">Giriş Yap</span>
+        <svg class="user-pill-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </div>
+
+      <div class="user-profile-dropdown hidden" id="user-profile-dropdown">
+        <div class="user-dropdown-header">
+          <div class="user-dropdown-avatar-wrap">
+            <img id="dropdown-user-avatar" src="" alt="" />
+          </div>
+          <div class="user-dropdown-info">
+            <span class="user-dropdown-name" id="dropdown-user-name">Misafir</span>
+            <span class="user-dropdown-handle" id="dropdown-user-handle">@misafir</span>
+            <span class="user-dropdown-code" id="dropdown-user-code" title="Click to copy code">Giriş Yap / Kayıt Ol</span>
+          </div>
+        </div>
+        <div class="user-dropdown-divider"></div>
+        <button class="user-dropdown-item" id="btn-menu-profile">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <span>Profile & Stats</span>
+        </button>
+        <button class="user-dropdown-item" id="btn-menu-friends">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span>Friend Activity</span>
+        </button>
+        <button class="user-dropdown-item" id="btn-menu-edit-profile">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+          <span>Edit Profile</span>
+        </button>
+        <button class="user-dropdown-item" id="btn-menu-switch-profile">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+          <span>Switch Account</span>
+        </button>
+        <button class="user-dropdown-item" id="btn-menu-firebase">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <span id="btn-menu-firebase-label">Raser Hesabı</span>
+        </button>
+        <div class="user-dropdown-divider"></div>
+        <button class="user-dropdown-item" id="btn-menu-share-code">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+          <span>Copy Friend Code</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <div class="app-layout">
@@ -109,6 +160,15 @@
           </div>
         </button>
 
+        <button class="nav-item" data-view="profile" id="nav-profile" title="Profile & Social">
+          <div class="nav-indicator">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+        </button>
+
         <button class="nav-item" data-view="favorites" id="nav-favorites" title="Favorites">
           <div class="nav-indicator">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -118,15 +178,6 @@
           </div>
         </button>
         <button class="nav-item" data-view="albums" id="nav-albums" title="Albums"><div class="nav-indicator"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg><span class="nav-badge" id="albums-count">0</span></div></button>
-
-        <button class="nav-item" data-view="local" id="nav-local" title="My files">
-          <div class="nav-indicator">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-            </svg>
-            <span class="nav-badge" id="local-count">0</span>
-          </div>
-        </button>
 
         <button class="nav-item" data-view="history" id="nav-history" title="History">
           <div class="nav-indicator">
@@ -161,11 +212,10 @@
               <line x1="17" y1="16" x2="23" y2="16"></line>
             </svg>
           </button>
-          <button class="rail-icon-btn" id="btn-toggle-playlists-drawer" title="Playlists">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15V6M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM12 12H3M16 6H3M12 18H3"></path>
-            </svg>
-          </button>
+        </div>
+
+        <div class="sidebar-playlists-scroll" id="sidebar-playlists-scroll">
+          <div class="sidebar-playlists-container" id="sidebar-playlists-container"></div>
         </div>
 
         <div class="sidebar-bottom-spacer"></div>
@@ -384,7 +434,12 @@
             <span class="playlist-type-badge">Playlist</span>
             <h2 id="playlist-detail-title">Playlist title</h2>
             <div id="playlist-detail-desc" class="playlist-inline-desc" data-placeholder="Add a description..."></div>
-            <span class="view-subtitle" id="playlist-detail-count">0 tracks</span>
+            <div class="playlist-creator-row" id="playlist-creator-row">
+              <img class="playlist-creator-avatar" id="playlist-creator-avatar" src="" alt="Creator" />
+              <span class="playlist-creator-name" id="playlist-creator-name">Kullanıcı</span>
+              <span class="playlist-creator-dot">•</span>
+              <span class="view-subtitle" id="playlist-detail-count">0 tracks</span>
+            </div>
             <div class="action-bar playlist-actions">
               <select class="pill-select" id="playlist-sort" title="Sort playlist" aria-label="Sort playlist" style="display:none">
                 <option value="manual">Manual order</option>
@@ -507,6 +562,268 @@
               <h2 class="artist-tracks-title">Albums</h2>
             </div>
             <div class="artist-albums-grid" id="artist-albums-grid"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-view" id="view-profile">
+        <div class="profile-hero">
+          <div class="profile-avatar-container">
+            <img class="profile-avatar-img" id="profile-avatar-display" src="" alt="Profile avatar">
+            <div class="profile-avatar-overlay" id="btn-edit-profile-avatar" title="Change avatar">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            </div>
+          </div>
+          <div class="profile-meta-info">
+            <span class="profile-type-badge">PROFILE</span>
+            <h1 class="profile-display-name" id="profile-name-display">Misafir</h1>
+            <div class="profile-handles">
+              <span class="profile-username" id="profile-handle-display">@misafir</span>
+              <span class="profile-code-pill" id="profile-code-display" title="Click to copy Raser Friend Code">Giriş Yap / Kayıt Ol</span>
+              <span class="profile-cloud-badge" id="profile-cloud-badge" title="Raser Hesap Durumu">⚪ Giriş Yapılmadı</span>
+            </div>
+            <p class="profile-bio" id="profile-bio-display">Giriş yaparak müziğini ve arkadaşlarını bulutla senkronize et.</p>
+            <div class="profile-genres-row" id="profile-genres-display"></div>
+            <div class="profile-stats-counters">
+              <div class="profile-stat-item"><span class="stat-number" id="stat-following-count">0</span><span class="stat-label">Following</span></div>
+              <div class="profile-stat-divider"></div>
+              <div class="profile-stat-item"><span class="stat-number" id="stat-followers-count">0</span><span class="stat-label">Followers</span></div>
+              <div class="profile-stat-divider"></div>
+              <div class="profile-stat-item"><span class="stat-number" id="stat-plays-count">0</span><span class="stat-label">Tracks Played</span></div>
+              <div class="profile-stat-divider"></div>
+              <div class="profile-stat-item"><span class="stat-number" id="stat-minutes-count">0m</span><span class="stat-label">Listened</span></div>
+            </div>
+          </div>
+          <div class="profile-actions-bar">
+            <button class="btn-pill-primary" id="btn-profile-edit-modal">Edit Profile</button>
+            <button class="btn-outline-pill" id="btn-profile-add-friend">+ Add Friend</button>
+            <button class="btn-outline-pill" id="btn-profile-cloud-sync" title="Raser Hesabı">👤 Raser Hesabı</button>
+            <button class="btn-icon-pill" id="btn-profile-share-code" title="Copy Friend Code">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="profile-nav-tabs">
+          <button class="profile-tab-btn active" data-tab="overview">Overview</button>
+          <button class="profile-tab-btn" data-tab="wrapped">Stats & Wrapped</button>
+          <button class="profile-tab-btn" data-tab="friends">Friends & Activity</button>
+          <button class="profile-tab-btn" data-tab="notes">Music Journal & Notes</button>
+        </div>
+
+        <div class="profile-tab-content">
+          <div class="profile-pane active" id="pane-profile-overview">
+            <div class="profile-section-header">
+              <h3>Top Artists</h3>
+            </div>
+            <div class="profile-top-artists-row" id="profile-overview-artists"></div>
+
+            <div class="profile-section-header" style="margin-top: 24px;">
+              <h3>Top Songs</h3>
+            </div>
+            <div class="tracks-list compact" id="profile-overview-tracks"></div>
+          </div>
+
+          <div class="profile-pane hidden" id="pane-profile-wrapped">
+            <div class="wrapped-card-banner">
+              <div class="wrapped-banner-glow"></div>
+              <div class="wrapped-banner-content">
+                <span class="wrapped-tag">PERSONAL WRAPPED</span>
+                <h2>Your Listening Insights</h2>
+                <p>Telemetry-free, private analytics calculated completely on your device.</p>
+              </div>
+            </div>
+            <div class="wrapped-grid">
+              <div class="wrapped-metric-card">
+                <span class="metric-title">Total Tracks Played</span>
+                <span class="metric-value" id="wrapped-total-plays">28</span>
+              </div>
+              <div class="wrapped-metric-card">
+                <span class="metric-title">Listening Time</span>
+                <span class="metric-value" id="wrapped-total-time">94 mins</span>
+              </div>
+              <div class="wrapped-metric-card">
+                <span class="metric-title">#1 Artist</span>
+                <span class="metric-value highlight" id="wrapped-top-artist">Motive</span>
+              </div>
+            </div>
+            <div class="profile-section-header" style="margin-top: 24px;">
+              <h3>Top Played Artists</h3>
+            </div>
+            <div class="artist-ranking-list" id="wrapped-artist-list"></div>
+          </div>
+
+          <div class="profile-pane hidden" id="pane-profile-friends">
+            <div class="profile-section-header">
+              <h3>Following (<span id="friends-list-count">3</span>)</h3>
+              <button class="btn-outline-pill" id="btn-pane-add-friend" style="height: 32px; font-size: 12px;">+ Add Friend by Code</button>
+            </div>
+            <div class="friends-grid" id="profile-friends-grid"></div>
+          </div>
+
+          <div class="profile-pane hidden" id="pane-profile-notes">
+            <div class="profile-section-header">
+              <h3>Music Memories & Journal</h3>
+              <span class="view-subtitle">Personal notes and recollections saved to tracks</span>
+            </div>
+            <div class="track-notes-container" id="profile-track-notes-container"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Full Page View: Auth & Registration -->
+      <section class="content-view" id="view-auth">
+        <div class="auth-page-view">
+          <button class="btn-icon-pill" id="btn-back-auth" title="Back" style="margin-bottom: 20px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          </button>
+
+          <div class="auth-card-container">
+            <div class="auth-card-header">
+              <div class="auth-app-logo">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+              </div>
+              <h1 class="auth-page-title">Raser Hesabı</h1>
+              <p class="auth-page-subtitle">Müzik zevkini keşfet, istatistiklerini kaydet ve arkadaşlarınla senkronize ol.</p>
+            </div>
+
+            <!-- Logged In State Box -->
+            <div id="auth-logged-in-box" class="auth-logged-in-box hidden">
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <img id="auth-user-avatar" src="" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover;">
+                <div style="display: flex; flex-direction: column;">
+                  <span id="auth-user-name" style="font-size: 18px; font-weight: 700; color: var(--md-sys-color-on-surface);">User</span>
+                  <span id="auth-user-email" style="font-size: 13px; color: var(--md-sys-color-outline);">user@email.com</span>
+                  <span style="font-size: 12px; color: var(--md-sys-color-primary); font-weight: 600; margin-top: 4px;">🟢 Hesabın Senkronize</span>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px; margin-top: 14px;">
+                <button type="button" class="btn-pill-primary" id="btn-auth-goto-profile" style="flex: 1; height: 40px; font-weight: 700;">Profilime Git</button>
+                <button type="button" class="btn-outline-pill" id="btn-auth-logout" style="flex: 1; height: 40px;">Çıkış Yap</button>
+              </div>
+            </div>
+
+            <!-- Sign In / Register Forms -->
+            <div id="auth-form-container" class="auth-form-container">
+              <div class="profile-nav-tabs" style="margin-bottom: 20px;">
+                <button class="profile-tab-btn active" id="auth-tab-btn-signin">Giriş Yap</button>
+                <button class="profile-tab-btn" id="auth-tab-btn-register">Hesap Oluştur</button>
+              </div>
+
+              <!-- Sign In Form -->
+              <div id="auth-pane-signin" class="auth-pane">
+                <div class="auth-input-group">
+                  <label class="auth-input-label">E-posta</label>
+                  <input type="email" id="auth-input-email" class="pill-text-input" placeholder="ornek@email.com" autocomplete="email">
+                </div>
+                <div class="auth-input-group">
+                  <label class="auth-input-label">Şifre</label>
+                  <input type="password" id="auth-input-password" class="pill-text-input" placeholder="Şifreniz" autocomplete="current-password">
+                </div>
+                <button type="button" class="btn-pill-primary auth-submit-btn" id="btn-auth-signin">Giriş Yap</button>
+              </div>
+
+              <!-- Register & Onboarding Form -->
+              <div id="auth-pane-register" class="auth-pane hidden">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div class="auth-input-group">
+                    <label class="auth-input-label">Görünen Ad</label>
+                    <input type="text" id="auth-reg-name" class="pill-text-input" placeholder="Adınız">
+                  </div>
+                  <div class="auth-input-group">
+                    <label class="auth-input-label">Kullanıcı Adı (@)</label>
+                    <input type="text" id="auth-reg-username" class="pill-text-input" placeholder="kullaniciadi">
+                  </div>
+                </div>
+
+                <div class="auth-input-group">
+                  <label class="auth-input-label">E-posta Adresi</label>
+                  <input type="email" id="auth-reg-email" class="pill-text-input" placeholder="ornek@email.com" autocomplete="email">
+                </div>
+                <div class="auth-input-group">
+                  <label class="auth-input-label">Şifre</label>
+                  <input type="password" id="auth-reg-password" class="pill-text-input" placeholder="En az 6 karakter" autocomplete="new-password">
+                </div>
+
+                <!-- Spotify-Style Artist Selection & Search -->
+                <div class="auth-artist-section">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span class="auth-input-label" style="margin: 0; font-size: 13px; font-weight: 700;">Sevdiğin Sanatçıları Seç</span>
+                    <span id="auth-artists-count-badge" class="auth-badge">0 seçildi</span>
+                  </div>
+
+                  <div style="position: relative; margin-bottom: 12px;">
+                    <input type="text" id="auth-artist-search" class="pill-text-input" placeholder="Sanatçı ara... (örn: Motive, Ezhel, Travis Scott)" autocomplete="off" style="padding-left: 36px; height: 38px; border-radius: 19px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position: absolute; left: 14px; top: 12px; color: var(--md-sys-color-outline); pointer-events: none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  </div>
+
+                  <div id="auth-artists-grid" class="reg-artists-grid"></div>
+                </div>
+
+                <!-- Avatar Selection -->
+                <div class="auth-input-group" style="margin-top: 14px;">
+                  <label class="auth-input-label">Profil Avatarı</label>
+                  <div id="auth-avatar-choices" style="display: flex; gap: 12px; align-items: center;"></div>
+                </div>
+
+                <button type="button" class="btn-pill-primary auth-submit-btn" id="btn-auth-register" style="margin-top: 16px;">Kayıt Ol ve Başla</button>
+              </div>
+
+              <div id="auth-status-msg" class="hidden" style="font-size: 13px; text-align: center; margin-top: 10px;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Full Page View: Edit Profile -->
+      <section class="content-view" id="view-edit-profile">
+        <div class="edit-profile-view">
+          <button class="btn-icon-pill" id="btn-back-edit-profile" title="Back" style="margin-bottom: 20px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+          </button>
+
+          <div class="edit-profile-container">
+            <h1 class="section-title" style="margin-bottom: 6px;">Profili Düzenle</h1>
+            <p class="view-subtitle" style="margin-bottom: 24px;">Raser profilini, görünen adını ve tercihlerini özelleştir.</p>
+
+            <div class="edit-profile-layout">
+              <!-- Left side: Avatar & Visuals -->
+              <div class="edit-profile-side">
+                <div class="edit-avatar-big-wrap">
+                  <img id="edit-page-avatar-preview" src="" alt="Avatar Preview">
+                </div>
+                <span style="font-size: 13px; font-weight: 600; color: var(--md-sys-color-on-surface); margin-top: 14px;">Avatar Seç</span>
+                <div id="edit-page-avatar-choices" style="display: flex; gap: 10px; margin-top: 8px;"></div>
+              </div>
+
+              <!-- Right side: Fields -->
+              <div class="edit-profile-form">
+                <div class="auth-input-group">
+                  <label class="auth-input-label">Görünen Ad</label>
+                  <input type="text" id="edit-page-name" class="pill-text-input" placeholder="Adınız">
+                </div>
+
+                <div class="auth-input-group">
+                  <label class="auth-input-label">Kullanıcı Adı (@handle)</label>
+                  <input type="text" id="edit-page-username" class="pill-text-input" placeholder="kullaniciadi">
+                </div>
+
+                <div class="auth-input-group">
+                  <label class="auth-input-label">Biyografi & Hakkında</label>
+                  <textarea id="edit-page-bio" class="pill-text-input" rows="3" style="border-radius: 14px; resize: none;" placeholder="Kendinden, müzik zevkinden bahset..."></textarea>
+                </div>
+
+                <div class="auth-input-group">
+                  <label class="auth-input-label">Müzik Türleri (Virgülle ayırın)</label>
+                  <input type="text" id="edit-page-genres" class="pill-text-input" placeholder="Hip-Hop, Rap, Trap, R&B">
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                  <button type="button" class="btn-pill-primary" id="btn-save-page-profile" style="padding: 10px 28px; font-weight: 700;">Değişiklikleri Kaydet</button>
+                  <button type="button" class="btn-outline-pill" id="btn-cancel-page-profile" style="padding: 10px 24px;">İptal</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -2243,6 +2560,10 @@
       <div class="panel-resize-edge" id="panel-resize-edge"></div>
       <div class="right-panel-banner" id="right-panel-banner"><div class="banner-image"></div></div>
       <div class="right-panel-header">
+        <div class="right-panel-tabs">
+          <button class="right-panel-tab active" id="tab-lyrics-view">Lyrics</button>
+          <button class="right-panel-tab" id="tab-friends-view">Friends</button>
+        </div>
         <div class="right-panel-header-actions">
           <button class="lyrics-mode-btn" id="btn-lyrics-mode" title="Toggle line mode">
             <span>Word</span>
@@ -2251,6 +2572,14 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
+      </div>
+
+      <div class="right-panel-friends-container hidden" id="right-panel-friends-container">
+        <div class="friends-side-header">
+          <span>Friend Activity</span>
+          <button class="btn-outline-pill" id="btn-side-add-friend" style="padding: 2px 10px; font-size: 11px;">+ Add</button>
+        </div>
+        <div class="friends-side-list" id="friends-side-list"></div>
       </div>
 
       <div class="right-panel-artwork-box" id="right-panel-artwork-box">
@@ -3793,6 +4122,66 @@
     </div>
   </div>
 
+  <!-- Modal: Add Friend -->
+  <div class="modal-backdrop hidden" id="modal-add-friend">
+    <div class="dialog-card" style="width: 420px;">
+      <div class="dialog-header">
+        <h3 class="dialog-title">Follow a Friend</h3>
+        <button class="btn-icon-pill" id="btn-close-add-friend-modal">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="dialog-content" style="display: flex; flex-direction: column; gap: 12px;">
+        <p style="font-size: 13px; color: var(--md-sys-color-on-surface-variant); line-height: 1.4;">Enter your friend's Raser Code (e.g. <code>RS-MOTIVE</code>) or paste their profile data to see what they are listening to in real time.</p>
+        <input type="text" id="input-friend-code" class="pill-text-input" placeholder="e.g. RS-MOTIVE or paste code" autocomplete="off">
+        <div id="add-friend-status" class="hidden" style="font-size: 12px; text-align: center;"></div>
+      </div>
+      <div class="dialog-actions" style="margin-top: 16px;">
+        <button type="button" class="btn-outline-pill" id="btn-cancel-add-friend">Cancel</button>
+        <button type="button" class="btn-pill-primary" id="btn-submit-add-friend">Follow</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Track Note & Memory -->
+  <div class="modal-backdrop hidden" id="modal-track-note">
+    <div class="dialog-card" style="width: 440px;">
+      <div class="dialog-header">
+        <h3 class="dialog-title">Song Memory / Note</h3>
+        <button class="btn-icon-pill" id="btn-close-track-note-modal">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="dialog-content" style="display: flex; flex-direction: column; gap: 10px;">
+        <div id="track-note-meta-preview" style="font-size: 13px; font-weight: 600; color: var(--md-sys-color-primary);"></div>
+        <p style="font-size: 12px; color: var(--md-sys-color-outline);">Save a personal memory, reflection, or note for this track. Visible on your profile.</p>
+        <textarea id="track-note-input" class="pill-text-input" rows="3" style="border-radius: 12px; resize: none;" placeholder="e.g. Discovered this during summer 2024 trip with friends..."></textarea>
+      </div>
+      <div class="dialog-actions" style="margin-top: 16px;">
+        <button type="button" class="btn-outline-pill" id="btn-delete-track-note">Delete Note</button>
+        <button type="button" class="btn-pill-primary" id="btn-save-track-note">Save Memory</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Switch Profile -->
+  <div class="modal-backdrop hidden" id="modal-switch-profile">
+    <div class="dialog-card" style="width: 400px;">
+      <div class="dialog-header">
+        <h3 class="dialog-title">Switch Account</h3>
+        <button class="btn-icon-pill" id="btn-close-switch-profile-modal">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="dialog-content" style="display: flex; flex-direction: column; gap: 10px;">
+        <div id="switch-profile-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 14%, transparent);">
+          <button type="button" class="btn-outline-pill" id="btn-add-new-profile-prompt" style="width: 100%;">+ Create New Profile</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-container" id="toast-container"></div>
 
   <div id="css-editor" class="css-editor hidden">
@@ -3813,6 +4202,11 @@
   <script src="shapes.js"></script>
   <script src="lyrics-rtl.js"></script>
   <script src="track-sort.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="firebase.js"></script>
+  <script src="account.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
