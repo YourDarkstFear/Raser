@@ -308,55 +308,45 @@ body.perf .titlebar { transition: none !important; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 16px;
   background: transparent;
   z-index: 90;
   position: relative;
 }
 
 .search-box-wrapper {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translateY(-50%) translateX(-50%);
-  width: min(560px, max(200px, calc(100% - (var(--engine-w, 435px) + 36px) * 2)));
-  max-width: 560px;
+  position: relative;
+  left: auto;
+  top: auto;
+  transform: none;
+  flex: 0 1 480px;
+  max-width: 480px;
+  min-width: 220px;
   margin: 0;
   z-index: 2;
-  transition: left 0.35s cubic-bezier(0.2, 0, 0, 1),
-              transform 0.35s cubic-bezier(0.2, 0, 0, 1),
-              width 0.35s cubic-bezier(0.2, 0, 0, 1),
-              max-width 0.35s cubic-bezier(0.2, 0, 0, 1);
+  transition: width 0.25s ease, max-width 0.25s ease;
 }
 
 .top-nav.search-pos-middle .search-box-wrapper,
 .top-nav:not(.search-pos-left):not(.search-pos-right) .search-box-wrapper {
-  left: 50%;
-  transform: translateY(-50%) translateX(-50%);
-  width: min(560px, max(200px, calc(100% - (var(--engine-w, 435px) + 36px) * 2)));
+  margin: 0 auto;
 }
 
 .top-nav.search-pos-left .search-box-wrapper {
-  left: 24px;
-  transform: translateY(-50%) translateX(0);
-  width: min(560px, calc(100% - 48px - var(--engine-w, 435px) - var(--engine-gap, 16px)));
+  margin-right: auto;
+  margin-left: 0;
 }
 
 .top-nav.search-pos-right .search-box-wrapper {
-  left: calc(100% - 24px - var(--engine-w, 435px) - var(--engine-gap, 16px));
-  transform: translateY(-50%) translateX(-100%);
-  width: min(560px, calc(100% - 48px - var(--engine-w, 435px) - var(--engine-gap, 16px)));
+  margin-left: auto;
+  margin-right: 0;
 }
 
 @media (max-width: 1120px) {
   .search-box-wrapper {
-    position: relative !important;
-    left: auto !important;
-    top: auto !important;
-    transform: none !important;
-    flex: 1 1 300px !important;
-    max-width: 440px !important;
-    width: auto !important;
+    flex: 1 1 260px !important;
+    max-width: 400px !important;
+    margin: 0 !important;
   }
   .platform-switch-container {
     flex-shrink: 0 !important;
@@ -5236,15 +5226,15 @@ button:not(.nav-item):not(.settings-nav-btn):active svg, button:not(.nav-item):n
 #playlist-detail-cover,
 .playlist-cover-wrapper,
 .playlist-detail-header .playlist-cover-art {
-  width: 160px !important;
-  height: 160px !important;
-  min-width: 160px !important;
-  min-height: 160px !important;
-  max-width: 160px !important;
-  max-height: 160px !important;
+  width: 200px !important;
+  height: 200px !important;
+  min-width: 200px !important;
+  min-height: 200px !important;
+  max-width: 200px !important;
+  max-height: 200px !important;
   aspect-ratio: 1 / 1 !important;
   object-fit: cover !important;
-  border-radius: var(--md-shape-corner-medium, 16px) !important;
+  border-radius: 12px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -5252,19 +5242,21 @@ button:not(.nav-item):not(.settings-nav-btn):active svg, button:not(.nav-item):n
   position: static !important;
   inset: auto !important;
   flex-shrink: 0 !important;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45) !important;
 }
 
+.playlist-cover-wrapper img,
 .playlist-detail-header .cover-single-img,
-.playlist-detail-header img {
-  width: 160px !important;
-  height: 160px !important;
-  min-width: 160px !important;
-  min-height: 160px !important;
-  max-width: 160px !important;
-  max-height: 160px !important;
+.playlist-detail-header .playlist-cover-art img {
+  width: 200px !important;
+  height: 200px !important;
+  min-width: 200px !important;
+  min-height: 200px !important;
+  max-width: 200px !important;
+  max-height: 200px !important;
   aspect-ratio: 1 / 1 !important;
   object-fit: cover !important;
-  border-radius: var(--md-shape-corner-medium, 16px) !important;
+  border-radius: 12px !important;
   display: block !important;
   position: static !important;
   inset: auto !important;
@@ -11995,35 +11987,108 @@ body.perf .np-queue-panel { transition: none; }
 
 /* Spotify-style Playlist Creator Row */
 .playlist-creator-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin-top: 8px !important;
+  font-size: 13px !important;
 }
 .playlist-creator-avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1.5px solid rgba(255, 255, 255, 0.15);
-  background: var(--md-sys-color-surface-container-high);
-  flex-shrink: 0;
-  cursor: pointer;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  max-width: 24px !important;
+  max-height: 24px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  background: var(--md-sys-color-surface-container-high) !important;
+  flex-shrink: 0 !important;
+  cursor: pointer !important;
+  margin: 0 !important;
+  display: inline-block !important;
 }
 .playlist-creator-name {
-  font-weight: 700;
-  font-size: 13px;
-  color: var(--md-sys-color-on-surface);
-  cursor: pointer;
-  transition: color 0.15s ease, text-decoration 0.15s ease;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  color: var(--md-sys-color-on-surface) !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease, text-decoration 0.15s ease !important;
 }
 .playlist-creator-name:hover {
-  text-decoration: underline;
-  color: var(--md-sys-color-primary);
+  text-decoration: underline !important;
+  color: var(--md-sys-color-primary) !important;
 }
 .playlist-creator-dot {
-  font-size: 12px;
-  color: var(--md-sys-color-outline);
-  opacity: 0.7;
+  font-size: 12px !important;
+  color: var(--md-sys-color-outline) !important;
+  opacity: 0.7 !important;
+}
+
+/* Spotify-Quality Profile Top Artists Carousel & Cards */
+.profile-top-artists-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  gap: 16px !important;
+  overflow-x: auto !important;
+  padding: 10px 4px 18px 4px !important;
+  scrollbar-width: thin !important;
+}
+.profile-artist-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 124px !important;
+  min-width: 124px !important;
+  padding: 14px 10px !important;
+  border-radius: 16px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  cursor: pointer !important;
+  text-align: center !important;
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), background-color 0.2s ease, box-shadow 0.2s ease !important;
+  box-sizing: border-box !important;
+}
+.profile-artist-card:hover {
+  transform: translateY(-4px) !important;
+  background: rgba(255, 255, 255, 0.09) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+}
+.profile-artist-avatar-wrap {
+  width: 80px !important;
+  height: 80px !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  background: var(--md-sys-color-surface-container-high) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+  position: relative !important;
+  flex-shrink: 0 !important;
+}
+.profile-artist-avatar-wrap img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  transition: transform 0.3s ease !important;
+}
+.profile-artist-card:hover .profile-artist-avatar-wrap img {
+  transform: scale(1.08) !important;
+}
+.profile-artist-name {
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  color: var(--md-sys-color-on-surface) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  width: 100% !important;
+}
+.profile-artist-count {
+  font-size: 11px !important;
+  color: var(--md-sys-color-outline) !important;
+  font-weight: 500 !important;
 }
 

@@ -513,7 +513,99 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   injectM3Shapes();
 
+  const TURKISH_I18N_DICT = {
+    'About': 'Hakkında',
+    'About the artist': 'Sanatçı Hakkında',
+    'Follow': 'Takip Et',
+    'Following': 'Takip Edilen',
+    'Followers': 'Takipçi',
+    'Word': 'Kelime',
+    'Line': 'Satır',
+    'Default output': 'Varsayılan Çıkış Cihazı',
+    'No local tracks in library yet.': 'Kitaplıkta henüz yerel şarkı yok.',
+    'Add files': 'Dosya Ekle',
+    'Manual order': 'Özel Sıralama',
+    'Date added (newest)': 'Eklenme Tarihi (En Yeni)',
+    'Date added (oldest)': 'Eklenme Tarihi (En Eski)',
+    'Play': 'Oynat',
+    'Play playlist shuffled': 'Karışık Çal',
+    'Download all': 'Tümünü İndir',
+    'Export as JSON': 'JSON Olarak Dışa Aktar',
+    'Playback queue is empty': 'Çalma kuyruğu boş',
+    'Play a track or add songs to queue to start listening': 'Dinlemeye başlamak için bir şarkı çalın veya sıraya ekleyin',
+    'Clear queue': 'Kuyruğu Temizle',
+    'No track playing': 'Şu an çalan şarkı yok',
+    'Select a track to listen': 'Dinlemek için bir şarkı seçin',
+    'Tracks Played': 'Çalınan Şarkı',
+    'Listened': 'Dinlendi',
+    'Overview': 'Genel Bakış',
+    'Stats & Wrapped': 'İstatistikler & Wrapped',
+    'Friends & Activity': 'Arkadaşlar & Canlı Aktivite',
+    'Music Journal & Notes': 'Müzik Günlüğü & Anılar',
+    'Top Artists': 'En Çok Dinlenen Sanatçılar',
+    'Top Songs': 'En Çok Dinlenen Şarkılar',
+    'Top Played Artists': 'En Çok Çalınan Sanatçılar',
+    'Total Tracks Played': 'Toplam Çalınan Şarkı',
+    'Listening Time': 'Dinleme Süresi',
+    '#1 Artist': '1 Numaralı Sanatçı',
+    'Edit Profile': 'Profili Düzenle',
+    '+ Add Friend': '+ Arkadaş Ekle',
+    'Switch Account': 'Hesap Değiştir',
+    'Profile & Stats': 'Profil & İstatistikler',
+    'Friend Activity': 'Canlı Arkadaş Aktivitesi',
+    'Personal Wrapped': 'Kişisel Wrapped',
+    'Your Listening Insights': 'Dinleme Bilgileriniz',
+    'Telemetry-free, private analytics calculated completely on your device.': 'Tamamen cihazınızda hesaplanan telemetri içermeyen, özel analizler.',
+    'Music Memories & Journal': 'Müzik Anıları & Notlar',
+    'Personal notes and recollections saved to tracks': 'Şarkılara eklediğiniz kişisel notlar ve hatıralar',
+    'Search tracks, artists, or albums...': 'Parça, sanatçı veya albüm arayın...',
+    '0 tracks': '0 şarkı',
+    '0 tracks saved': '0 şarkı kaydedildi',
+    '0 tracks in library': 'Kitaplıkta 0 şarkı',
+    'No favorite tracks yet\n            Click the heart icon on any song to save it to your library': 'Henüz favori şarkı eklenmedi. Kitaplığına eklemek için bir şarkının kalp simgesine tıkla.',
+    'No recently played tracks\n            Songs you play will appear in your listening history': 'Henüz çalınan şarkı yok. Dinlediğin şarkılar burada görünecektir.',
+    'Home': 'Ana Sayfa',
+    'Search': 'Ara',
+    'Your Library': 'Kitaplığın',
+    'Liked Songs': 'Beğenilen Şarkılar',
+    'Downloads': 'İndirilenler',
+    'History': 'Geçmiş',
+    'Settings': 'Ayarlar',
+    'Playlists': 'Çalma Listeleri',
+    'Create playlist': 'Çalma Listesi Oluştur',
+    'New Playlist': 'Yeni Çalma Listesi',
+    'Queue': 'Çalma Sırası',
+    'Up Next': 'Sıradaki',
+    'Now Playing': 'Şu An Çalıyor',
+    'Lyrics': 'Şarkı Sözleri',
+    'Equalizer': 'Ekolayzer',
+    'Audio': 'Ses Ayarları',
+    'General': 'Genel',
+    'Appearance': 'Görünüm',
+    'Guest': 'Misafir',
+    'Sign In': 'Giriş Yap',
+    'Create Account': 'Hesap Oluştur',
+    'Sign Out': 'Çıkış Yap',
+    'Profile': 'Profil',
+    'Add to playlist': 'Çalma listesine ekle',
+    'Remove from playlist': 'Çalma listesinden kaldır',
+    'Add to queue': 'Sıraya ekle',
+    'Play next': 'Sırada çal',
+    'Go to artist': 'Sanatçıya git',
+    'Go to album': 'Albüme git',
+    'Save': 'Kaydet',
+    'Cancel': 'İptal',
+    'Close': 'Kapat',
+    'Retry': 'Tekrar Dene',
+    'Offline': 'Çevrimdışı',
+    'Delete': 'Sil',
+    'loading track...': 'şarkı yükleniyor...',
+    'buffering stream': 'akış yükleniyor',
+    'buffering audio stream': 'ses akışı hazırlanıyor'
+  };
+
   const i18nSessionMap = new Map();
+  i18nSessionMap.set('tr', new Map(Object.entries(TURKISH_I18N_DICT)));
 
   function t(str) {
     if (!str || typeof str !== 'string') return str;
@@ -10255,9 +10347,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function prefetchVisibleTracks(tracks) {
     if (!Array.isArray(tracks) || !tracks.length) return;
+    const limit = Math.max(4, SEARCH_STREAM_PREFETCH_LIMIT || 4);
     tracks
-      .filter(track => track && track.platform === 'soundcloud')
-      .slice(0, SEARCH_STREAM_PREFETCH_LIMIT)
+      .filter(track => track && track.platform !== 'local' && !track._preloadedStreamUrl)
+      .slice(0, limit)
       .forEach(enqueueStreamPrefetch);
   }
 
@@ -11406,36 +11499,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!tracks || tracks.length === 0) {
       container.style.paddingTop = '0px';
       container.style.paddingBottom = '0px';
+      const isTr = (localStorage.getItem('riff_ui_lang') || 'en') === 'tr';
       const emptyConfigs = {
         search: {
           badge: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>',
-          title: 'No matching tracks found',
-          sub: 'Try checking for typos or searching for a different track, artist, or album'
+          title: isTr ? 'Eşleşen parça bulunamadı' : 'No matching tracks found',
+          sub: isTr ? 'Yazım hatalarını kontrol edebilir veya farklı bir şarkı ya da sanatçı arayabilirsiniz' : 'Try checking for typos or searching for a different track, artist, or album'
         },
         favorites: {
           badge: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>',
-          title: 'No favorite tracks yet',
-          sub: 'Click the heart icon on any song to save it to your library'
+          title: isTr ? 'Henüz favori şarkı eklenmedi' : 'No favorite tracks yet',
+          sub: isTr ? 'Kitaplığınıza eklemek için herhangi bir şarkının kalp simgesine tıklayın' : 'Click the heart icon on any song to save it to your library'
         },
         playlist: {
           badge: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>',
-          title: 'This playlist is empty',
-          sub: 'Add songs to this playlist from search results or your favorites'
+          title: isTr ? 'Bu çalma listesi boş' : 'This playlist is empty',
+          sub: isTr ? 'Arama sonuçlarından veya favorilerinizden bu listeye şarkı ekleyin' : 'Add songs to this playlist from search results or your favorites'
         },
         queue: {
           badge: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6.5h16M4 12h16M4 17.5h10"></path></svg>',
-          title: 'Playback queue is empty',
-          sub: 'Play a track or add songs to queue to start listening'
+          title: isTr ? 'Çalma kuyruğu boş' : 'Playback queue is empty',
+          sub: isTr ? 'Dinlemeye başlamak için bir parça seçin veya kuyruğa ekleyin' : 'Play a track or add songs to queue to start listening'
         },
         history: {
           badge: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><polyline points="12 6.5 12 12 15.5 14"></polyline></svg>',
-          title: 'No recently played tracks',
-          sub: 'Songs you play will appear in your listening history'
+          title: isTr ? 'Henüz çalınan şarkı yok' : 'No recently played tracks',
+          sub: isTr ? 'Dinlediğiniz şarkılar burada dinleme geçmişinizde görünecektir' : 'Songs you play will appear in your listening history'
         },
         local: {
           badge: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
-          title: 'Your local library is empty',
-          sub: 'Add local audio files or folders to get started'
+          title: isTr ? 'Yerel kitaplığınız boş' : 'Your local library is empty',
+          sub: isTr ? 'Başlamak için yerel ses dosyaları veya klasörler ekleyin' : 'Add local audio files or folders to get started'
         }
       };
       const cfg = emptyConfigs[context] || {
@@ -13524,11 +13618,25 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
       }
     }
     const totalSec = (pl.tracks || []).reduce((acc, t) => acc + (t.duration || 0), 0);
-    const durStr = totalSec > 0 ? ` • ${formatDuration(totalSec)}` : '';
-    if (el.playlistDetailCount) el.playlistDetailCount.textContent = (query ? `${filtered.length} of ${pl.tracks.length} tracks` : `${pl.tracks.length} tracks`) + durStr;
+    const formatPlaylistNaturalDuration = (sec) => {
+      if (!sec || sec <= 0) return '';
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      if (h > 0) return `${h} sa ${m} dk`;
+      return `${m} dk`;
+    };
+    const durStr = totalSec > 0 ? `, yaklaşık ${formatPlaylistNaturalDuration(totalSec)}` : '';
+    if (el.playlistDetailCount) {
+      el.playlistDetailCount.textContent = query
+        ? `${pl.tracks.length} şarkıdan ${filtered.length} tanesi${durStr}`
+        : `${pl.tracks.length} şarkı${durStr}`;
+    }
+    if (Array.isArray(filtered) && filtered.length > 0) {
+      prefetchVisibleTracks(filtered.slice(0, 4));
+    }
     const detailCover = document.getElementById('playlist-detail-cover');
     if (detailCover) {
-      renderPlaylistCover(detailCover, pl, 160);
+      renderPlaylistCover(detailCover, pl, 200);
       detailCover.style.cursor = 'pointer';
       detailCover.onclick = async () => {
         if (detailCover._zoomedFlag) return;
@@ -27139,11 +27247,6 @@ function bindCoverHoldZoom(wrapEl) {
     if (userProfilePill && userProfileDropdown) {
       userProfilePill.addEventListener('click', (e) => {
         e.stopPropagation();
-        const isAuthed = !!(window.RaserFirebase && window.RaserFirebase.getCurrentUser());
-        if (!isAuthed) {
-          switchView('auth');
-          return;
-        }
         const isOpen = !userProfileDropdown.classList.contains('hidden');
         if (isOpen) {
           userProfileDropdown.classList.add('hidden');
@@ -28021,26 +28124,63 @@ function bindCoverHoldZoom(wrapEl) {
     if (cFollowing) cFollowing.textContent = String(fCount);
     if (cFollowers) cFollowers.textContent = String(flwCount);
     if (cPlays) cPlays.textContent = String(stats.totalPlays || 0);
-    if (cMinutes) cMinutes.textContent = (stats.totalDurationMinutes || 0) + 'm';
+    const totalMin = stats.totalDurationMinutes || 0;
+    const durFormat = totalMin >= 60 ? `${Math.floor(totalMin / 60)} sa ${totalMin % 60} dk` : `${totalMin} dk`;
+    if (cMinutes) cMinutes.textContent = durFormat;
 
-    // Overview Tab - Top Artists
+    // Overview Tab - Top Artists (Spotify-Style Horizontal Live Carousel)
     const overviewArtistsEl = document.getElementById('profile-overview-artists');
     if (overviewArtistsEl) {
       overviewArtistsEl.innerHTML = '';
-      const artistEntries = Object.entries(stats.topArtists || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      const artistEntries = Object.entries(stats.topArtists || {}).sort((a, b) => b[1] - a[1]).slice(0, 8);
       if (artistEntries.length === 0) {
         overviewArtistsEl.innerHTML = '<div style="font-size: 13px; color: var(--md-sys-color-outline); padding: 16px 0;">Henüz dinleme verisi oluşmadı. Müzik çaldıkça en çok dinlediğin sanatçılar burada yer alacak.</div>';
       } else {
+        const artistPhotoCache = window._artistPhotoCache || (window._artistPhotoCache = new Map());
+        const getArtistAvatar = async (name) => {
+          if (!name) return '';
+          if (artistPhotoCache.has(name)) return artistPhotoCache.get(name);
+          try {
+            const res = await fetch(`http://127.0.0.1:${state.serverPort}/api/artist?name=${encodeURIComponent(name)}`);
+            const d = await res.json();
+            if (d && d.success && d.artist && (d.artist.avatar || d.artist.picture)) {
+              const pic = d.artist.avatar || d.artist.picture;
+              artistPhotoCache.set(name, pic);
+              return pic;
+            }
+          } catch (_) {}
+          return '';
+        };
+
         artistEntries.forEach(([artName, count]) => {
           const card = document.createElement('div');
-          card.style.cssText = 'display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100px; cursor: pointer; text-align: center;';
-          card.innerHTML = `
-            <div style="width: 72px; height: 72px; border-radius: 50%; overflow: hidden; background: var(--md-sys-color-surface-container-high); box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
-              <img src="https://cdn-images.dzcdn.net/images/artist/ebcf22e5c3a0eb3178b8a6f6bc1a5a6c/250x250-000000-80-0-0.jpg" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.src='https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent('${escapeHtml(artName)}');">
-            </div>
-            <span style="font-weight: 700; font-size: 12px; color: var(--md-sys-color-on-surface); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">${escapeHtml(artName)}</span>
-            <span style="font-size: 11px; color: var(--md-sys-color-outline);">${count} dinleme</span>
-          `;
+          card.className = 'profile-artist-card';
+          
+          const avatarWrap = document.createElement('div');
+          avatarWrap.className = 'profile-artist-avatar-wrap';
+          
+          const img = document.createElement('img');
+          img.alt = artName;
+          img.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="%23333"/><stop offset="100%" stop-color="%231a1a1a"/></linearGradient></defs><circle cx="50" cy="50" r="50" fill="url(%23g)"/><path d="M50 48a16 16 0 1 0 0-32 16 16 0 0 0 0 32zm0 8c-18 0-32 12-32 26v4h64v-4c0-14-14-26-32-26z" fill="%23666"/></svg>';
+          
+          getArtistAvatar(artName).then(url => {
+            if (url && img) img.src = url;
+          });
+
+          avatarWrap.appendChild(img);
+          card.appendChild(avatarWrap);
+
+          const nameEl = document.createElement('span');
+          nameEl.className = 'profile-artist-name';
+          nameEl.textContent = artName;
+          nameEl.title = artName;
+          card.appendChild(nameEl);
+
+          const countEl = document.createElement('span');
+          countEl.className = 'profile-artist-count';
+          countEl.textContent = `${count} dinleme`;
+          card.appendChild(countEl);
+
           card.addEventListener('click', () => openArtistProfile(artName));
           overviewArtistsEl.appendChild(card);
         });
