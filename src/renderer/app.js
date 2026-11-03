@@ -2398,7 +2398,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   ];
   window.TRANSLATION_LANGUAGES = TRANSLATION_LANGUAGES;
   const UI_TRANSLATION_LANGUAGES = TRANSLATION_LANGUAGES.filter(language =>
-    ['en', 'ru', 'uk'].includes(language.code)
+    ['en', 'tr', 'ru', 'uk'].includes(language.code)
   );
   const UI_TRANSLATION_LANGUAGE_CODES = new Set(UI_TRANSLATION_LANGUAGES.map(language => language.code));
 
