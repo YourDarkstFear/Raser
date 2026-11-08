@@ -71,6 +71,9 @@ if (k.startsWith('raser_')) {
   diskMap['raser_' + k.slice(5)] = v;
 }
 flushAsync();
+if (k === 'devsize_playlists' || k === 'devsize_history') {
+  try { window.dispatchEvent(new CustomEvent('raser:playlist-changed')); } catch (_) {}
+}
 return;
 }
 origSet.call(this, key, val);
@@ -90,6 +93,9 @@ if (altK && Object.prototype.hasOwnProperty.call(diskMap, altK)) {
   changed = true;
 }
 if (changed) flushAsync();
+if (k === 'devsize_playlists' || k === 'devsize_history') {
+  try { window.dispatchEvent(new CustomEvent('raser:playlist-changed')); } catch (_) {}
+}
 return;
 }
 origRemove.call(this, key);
@@ -100,6 +106,9 @@ if (this === window.localStorage) {
 diskMap = {};
 window.__RASER_STORAGE_MAP__ = window.__RIFF_STORAGE_MAP__ = diskMap;
 flushAsync();
+if (k === 'devsize_playlists' || k === 'devsize_history') {
+  try { window.dispatchEvent(new CustomEvent('raser:playlist-changed')); } catch (_) {}
+}
 return;
 }
 origClear.call(this);
@@ -952,6 +961,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   migrateAddedAt();
+
+  window.addEventListener('raser:cloud-library-updated', () => {
+    try {
+      state.playlists = safeArray('devsize_playlists');
+      state.history = safeArray('devsize_history');
+      state.favorites = safeArray('devsize_favorites');
+      if (typeof renderPlaylistsList === 'function') renderPlaylistsList();
+      if (typeof renderHistoryList === 'function') renderHistoryList();
+      if (typeof updateStats === 'function') updateStats();
+    } catch (_) {}
+  });
 
   applyFont(state.riffFont);
 
@@ -4207,7 +4227,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return t;
   }
   function buildRiffShareUrl(track, directStream = '', resolvedUrl = '', maxLen = 0) {
-    if (!track) return 'https://raser.iloveteto.com/';
+    if (!track) return 'https://raserapp.online/';
     applyTrackRenames(track);
     const isHttpUrl = (u) => typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://')) && !u.includes('127.0.0.1');
     const title = track.title || 'Untitled';
@@ -4226,14 +4246,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (directStream && isHttpUrl(directStream) && !directStream.includes('.m3u8')) params.set('stream', directStream);
     if (isHttpUrl(rawThumb)) params.set('img', rawThumb);
     if (track.duration) params.set('dur', String(Math.round(Number(track.duration))));
-    let full = 'https://raser.iloveteto.com/?' + params.toString();
+    let full = 'https://raserapp.online/?' + params.toString();
     if (maxLen > 0 && full.length > maxLen) {
       params.delete('stream');
-      full = 'https://raser.iloveteto.com/?' + params.toString();
+      full = 'https://raserapp.online/?' + params.toString();
     }
     if (maxLen > 0 && full.length > maxLen) {
       params.delete('img');
-      full = 'https://raser.iloveteto.com/?' + params.toString();
+      full = 'https://raserapp.online/?' + params.toString();
     }
     return maxLen > 0 ? full.slice(0, maxLen) : full;
   }
@@ -10437,7 +10457,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           ? customArt.cover
           : (track.thumbnail || track.cover || (typeof getTrackThumbUrl === 'function' ? getTrackThumbUrl(track) : '') || '');
 
-        const shortenRes = await fetch('https://raser.iloveteto.com/api/shorten', {
+        const shortenRes = await fetch('https://raserapp.online/api/shorten', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -96,6 +96,17 @@
         </button>
       </div>
     </div>
+
+    <div class="user-account-container" id="user-account-container">
+      <button class="btn-account-pill" id="btn-account-pill" type="button" title="Raser Account">
+        <span class="account-avatar-circle" id="account-avatar-circle">
+          <img id="account-avatar-img" class="account-avatar-img hidden" alt="" />
+          <svg id="account-avatar-default-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        </span>
+        <span class="account-name-label" id="account-name-label" data-i18n>Sign In</span>
+        <span class="cloud-sync-dot" id="cloud-sync-dot" title="Cloud Sync"></span>
+      </button>
+    </div>
   </div>
 
   <div class="app-layout">
@@ -3808,11 +3819,104 @@
     <div id="css-editor-host" class="css-editor-host"></div>
   </div>
 
+  <div class="modal-backdrop hidden" id="raser-account-modal">
+    <div class="dialog-card raser-account-card" style="width: 440px; max-width: 92vw; display: flex; flex-direction: column; gap: 16px;">
+      <div class="dialog-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="account-brand-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--md-sys-color-primary)" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-12.5v9l6-4.5-6-4.5z"/></svg>
+          </div>
+          <h3 id="account-modal-title" style="margin: 0;" data-i18n>Raser Account</h3>
+        </div>
+        <button class="btn-icon-pill" id="btn-close-account-modal" type="button" title="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="18" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- State A: Signed Out (Auth Form) -->
+      <div id="account-auth-view" style="display: flex; flex-direction: column; gap: 14px;">
+        <p style="margin: 0; font-size: calc(13px * var(--font-scale, 1)); color: var(--md-sys-color-on-surface-variant); line-height: 1.4;" data-i18n>
+          Seamlessly sync your music, playlists, and favorites across all your devices.
+        </p>
+
+        <!-- Segmented Tab: Sign In | Sign Up -->
+        <div class="sp-modes" id="account-auth-tabs">
+          <button type="button" class="sp-mode-btn active" id="tab-auth-login" data-i18n>Sign In</button>
+          <button type="button" class="sp-mode-btn" id="tab-auth-register" data-i18n>Sign Up</button>
+        </div>
+
+        <!-- Google 1-Click Sign In -->
+        <button type="button" class="btn-pill-primary google-signin-btn" id="btn-google-signin">
+          <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5.1 3.7-8.8z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3 0-.8.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 10.8 0 12s.7 2.3 1.9 4.7l3.7-2.9z"/><path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z"/></svg>
+          <span data-i18n>Continue with Google</span>
+        </button>
+
+        <div style="display: flex; align-items: center; gap: 10px; margin: 4px 0;">
+          <div style="flex: 1; height: 1px; background: var(--md-sys-color-outline-variant, rgba(255,255,255,0.1));"></div>
+          <span style="font-size: calc(11px * var(--font-scale, 1)); color: var(--md-sys-color-outline);" data-i18n>or with email</span>
+          <div style="flex: 1; height: 1px; background: var(--md-sys-color-outline-variant, rgba(255,255,255,0.1));"></div>
+        </div>
+
+        <div id="register-name-row" class="hidden">
+          <input type="text" id="auth-input-name" class="pill-text-input" placeholder="Display Name (optional)" autocomplete="name">
+        </div>
+        <input type="email" id="auth-input-email" class="pill-text-input" placeholder="Email address" autocomplete="email">
+        <input type="password" id="auth-input-password" class="pill-text-input" placeholder="Password" autocomplete="current-password">
+
+        <div style="display: flex; justify-content: flex-end;">
+          <button type="button" id="btn-forgot-password" class="btn-link" style="background: none; border: none; color: var(--md-sys-color-primary); font-size: calc(12px * var(--font-scale, 1)); cursor: pointer;" data-i18n>Forgot password?</button>
+        </div>
+
+        <div id="auth-status-msg" class="hidden" style="font-size: calc(12px * var(--font-scale, 1)); text-align: center; border-radius: 8px; padding: 6px 12px;"></div>
+
+        <button type="button" class="btn-pill-primary" id="btn-submit-auth" style="width: 100%;">
+          <span id="btn-submit-auth-label" data-i18n>Sign In</span>
+        </button>
+      </div>
+
+      <!-- State B: Signed In (Profile & Auto Sync Status) -->
+      <div id="account-profile-view" class="hidden" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="account-user-card" style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 20px; background: var(--md-sys-color-surface-container);">
+          <div class="account-profile-avatar" style="width: 48px; height: 48px; border-radius: 50%; overflow: hidden; background: var(--md-sys-color-surface-container-highest); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <img id="profile-avatar-img" class="hidden" style="width: 100%; height: 100%; object-fit: cover;" alt="">
+            <svg id="profile-avatar-fallback" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1;">
+            <span id="profile-display-name" style="font-size: calc(16px * var(--font-scale, 1)); font-weight: 600; color: var(--md-sys-color-on-surface); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">User</span>
+            <span id="profile-email" style="font-size: calc(12px * var(--font-scale, 1)); color: var(--md-sys-color-outline); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">user@example.com</span>
+            <div style="display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+              <span class="cloud-sync-dot synced" id="profile-sync-dot"></span>
+              <span id="account-sync-state-label" style="font-size: calc(12px * var(--font-scale, 1)); color: var(--md-sys-color-primary);" data-i18n>Synced with cloud</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Automatic Cloud Stats Summary (Material You Card) -->
+        <div style="padding: 12px 16px; border-radius: 16px; background: var(--md-sys-color-surface-container-low, rgba(255,255,255,0.03)); border: 1px solid var(--md-sys-color-outline-variant, rgba(255,255,255,0.06)); display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: calc(11px * var(--font-scale, 1)); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--md-sys-color-outline);" data-i18n>Cloud Library</span>
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: calc(13px * var(--font-scale, 1)); color: var(--md-sys-color-on-surface);">
+            <span id="account-stat-tracks">0 tracks</span>
+            <span style="color: var(--md-sys-color-outline);">•</span>
+            <span id="account-stat-playlists">0 playlists</span>
+            <span style="color: var(--md-sys-color-outline);">•</span>
+            <span id="account-stat-history">0 history</span>
+          </div>
+          <span style="font-size: calc(11px * var(--font-scale, 1)); color: var(--md-sys-color-outline); line-height: 1.3;" data-i18n>
+            Your playlists and listening history sync automatically with the cloud.
+          </span>
+        </div>
+
+        <button type="button" class="btn-outline-pill" id="btn-signout" style="width: 100%; height: 40px; color: var(--md-sys-color-error, #ff5449);" data-i18n>Sign Out</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../../assets/hls.min.js"></script>
   <script src="audio.js"></script>
   <script src="shapes.js"></script>
   <script src="lyrics-rtl.js"></script>
   <script src="track-sort.js"></script>
+  <script src="firebase-client.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
