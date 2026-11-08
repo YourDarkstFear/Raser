@@ -149,15 +149,26 @@
       db = window.firebase.firestore();
 
       auth.onAuthStateChanged(async (user) => {
-        currentUser = user;
-        updateAccountUI();
         if (user) {
+          currentUser = user;
+          updateAccountUI();
           await handleInitialSync(user);
           listenToCloudChanges(user);
         } else {
-          if (unsubscribeSnapshot) {
-            unsubscribeSnapshot();
-            unsubscribeSnapshot = null;
+          // Check if restored from desktop Google auth
+          const savedDesktopUser = getLocalJSON('raser_desktop_user', null);
+          if (savedDesktopUser && savedDesktopUser.uid) {
+            currentUser = savedDesktopUser;
+            updateAccountUI();
+            await handleInitialSync(savedDesktopUser);
+            listenToCloudChanges(savedDesktopUser);
+          } else {
+            currentUser = null;
+            updateAccountUI();
+            if (unsubscribeSnapshot) {
+              unsubscribeSnapshot();
+              unsubscribeSnapshot = null;
+            }
           }
         }
       });
@@ -402,7 +413,87 @@
     return cred;
   }
 
+  async function handleDesktopAuthPayload(authData) {
+    if (!authData || !authData.uid) return;
+    
+    setLocalJSON('raser_desktop_user', authData);
+    currentUser = {
+      uid: authData.uid,
+      displayName: authData.displayName || authData.email?.split('@')[0] || t('guest'),
+      email: authData.email || '',
+      photoURL: authData.photoURL || '',
+      isAnonymous: false,
+      idToken: authData.idToken
+    };
+
+    if (auth && (authData.googleIdToken || authData.idToken)) {
+      try {
+        const cred = window.firebase.auth.GoogleAuthProvider.credential(
+          authData.googleIdToken || null,
+          authData.googleAccessToken || null
+        );
+        await auth.signInWithCredential(cred);
+      } catch (e) {
+        console.warn('[RaserFirebase] Credential sign-in note:', e.message);
+      }
+    }
+
+    updateAccountUI();
+    showStatus(t('successLogin'), false);
+    
+    await handleInitialSync(currentUser);
+    listenToCloudChanges(currentUser);
+  }
+
   async function signInWithGoogle() {
+    const isDesktop = window.location.protocol === 'file:' || !!window.electronAPI;
+
+    if (isDesktop) {
+      let port = 38472;
+      try {
+        if (window.electronAPI && typeof window.electronAPI.getServerPort === 'function') {
+          port = (await window.electronAPI.getServerPort()) || 38472;
+        } else if (window.state && window.state.serverPort) {
+          port = window.state.serverPort;
+        }
+      } catch (_) {}
+
+      const bridgeUrl = `https://app.raserapp.online/auth-desktop?port=${port}`;
+      if (window.electronAPI && typeof window.electronAPI.openExternal === 'function') {
+        window.electronAPI.openExternal(bridgeUrl);
+      } else {
+        window.open(bridgeUrl, '_blank');
+      }
+
+      showStatus(getLang().startsWith('tr')
+        ? 'Tarayıcınızda Google giriş penceresi açıldı. Lütfen hesabınızı seçin...'
+        : 'Google sign-in opened in your browser. Please select your account...', false);
+
+      return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const maxAttempts = 120; // 2 minutes
+        const pollTimer = setInterval(async () => {
+          attempts++;
+          if (attempts > maxAttempts) {
+            clearInterval(pollTimer);
+            return reject(new Error(getLang().startsWith('tr') ? 'Google girişi zaman aşımına uğradı.' : 'Google sign-in timed out.'));
+          }
+
+          try {
+            const checkRes = await fetch(`http://127.0.0.1:${port}/api/desktop-auth-check`);
+            if (checkRes.ok) {
+              const data = await checkRes.json();
+              if (data && data.ready && data.auth) {
+                clearInterval(pollTimer);
+                await handleDesktopAuthPayload(data.auth);
+                return resolve(data.auth);
+              }
+            }
+          } catch (_) {}
+        }, 1000);
+      });
+    }
+
     if (!auth) throw new Error('Firebase not initialized');
     const provider = new window.firebase.auth.GoogleAuthProvider();
     provider.addScope('email');
@@ -416,12 +507,16 @@
   }
 
   async function signOut() {
-    if (!auth) return;
+    localStorage.removeItem('raser_desktop_user');
+    currentUser = null;
+    updateAccountUI();
     if (unsubscribeSnapshot) {
       unsubscribeSnapshot();
       unsubscribeSnapshot = null;
     }
-    await auth.signOut();
+    if (auth) {
+      try { await auth.signOut(); } catch (_) {}
+    }
   }
 
   async function resetPassword(email) {

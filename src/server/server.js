@@ -8184,7 +8184,12 @@ const server = http.createServer(async (req, res) => {
     let originAllowed = false;
     try {
       const originUrl = new URL(requestOrigin);
-      originAllowed = originUrl.protocol === 'file:' || originUrl.hostname === '127.0.0.1' || originUrl.hostname === 'localhost' || originUrl.hostname === '::1';
+      originAllowed = originUrl.protocol === 'file:' ||
+        originUrl.hostname === '127.0.0.1' ||
+        originUrl.hostname === 'localhost' ||
+        originUrl.hostname === '::1' ||
+        originUrl.hostname === 'app.raserapp.online' ||
+        originUrl.hostname === 'raserapp.online';
     } catch (e) {
       originAllowed = false;
     }
@@ -8209,6 +8214,37 @@ const server = http.createServer(async (req, res) => {
   const pathname = parsedUrl.pathname;
 
   if (pathname.startsWith('/api/lastfm/')) { handleLastFmRoute(req, res, pathname); return; }
+
+  // Desktop Firebase Google Auth Handshake
+  if (pathname === '/api/desktop-auth-receive' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body);
+        if (payload && payload.uid) {
+          global.__pendingDesktopAuth = payload;
+          global.__pendingDesktopAuthTime = Date.now();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ success: true }));
+        }
+      } catch (e) {}
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'invalid payload' }));
+    });
+    return;
+  }
+
+  if (pathname === '/api/desktop-auth-check' && req.method === 'GET') {
+    if (global.__pendingDesktopAuth && (Date.now() - (global.__pendingDesktopAuthTime || 0)) < 180000) {
+      const authData = global.__pendingDesktopAuth;
+      global.__pendingDesktopAuth = null;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ready: true, auth: authData }));
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ready: false }));
+  }
 
   if (TOKEN_PROTECTED_ROUTES.has(parsedUrl.pathname) && !tokenMatches(req.headers['x-raser-token'] || req.headers['x-riff-token'])) {
     res.writeHead(403, { 'Content-Type': 'application/json' });
