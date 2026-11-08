@@ -971,6 +971,7 @@ body.perf .app-icon-option-box {
   border-radius: 28px;
   overflow-y: auto;
   overflow-x: hidden;
+  overflow-anchor: none !important;
   padding: 28px 36px 120px 36px;
   position: relative;
   z-index: 10;
@@ -1562,18 +1563,21 @@ body.perf .my-wave-ambient-light {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  overflow-anchor: none !important;
 }
 .track-row {
   display: flex;
   align-items: center;
   gap: 16px;
+  height: 64px;
+  box-sizing: border-box;
   padding: 10px 18px;
   border-radius: 20px;
   background: transparent;
   border: none;
   position: relative;
   cursor: pointer;
-  transition: background-color var(--transition-hover-out), transform 0.12s cubic-bezier(0.2, 0, 0, 1);
+  transition: background-color var(--transition-hover-out);
   animation: m3FadeUp 350ms cubic-bezier(0.2, 0, 0, 1) backwards;
 }
 .track-row:not(.is-dragging):active,

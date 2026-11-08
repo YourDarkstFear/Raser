@@ -4207,7 +4207,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return t;
   }
   function buildRiffShareUrl(track, directStream = '', resolvedUrl = '', maxLen = 0) {
-    if (!track) return 'https://riff.hs.vc/share/';
+    if (!track) return 'https://raser.iloveteto.com/';
     applyTrackRenames(track);
     const isHttpUrl = (u) => typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://')) && !u.includes('127.0.0.1');
     const title = track.title || 'Untitled';
@@ -4226,14 +4226,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (directStream && isHttpUrl(directStream) && !directStream.includes('.m3u8')) params.set('stream', directStream);
     if (isHttpUrl(rawThumb)) params.set('img', rawThumb);
     if (track.duration) params.set('dur', String(Math.round(Number(track.duration))));
-    let full = 'https://riff.hs.vc/share/?' + params.toString();
+    let full = 'https://raser.iloveteto.com/?' + params.toString();
     if (maxLen > 0 && full.length > maxLen) {
       params.delete('stream');
-      full = 'https://riff.hs.vc/share/?' + params.toString();
+      full = 'https://raser.iloveteto.com/?' + params.toString();
     }
     if (maxLen > 0 && full.length > maxLen) {
       params.delete('img');
-      full = 'https://riff.hs.vc/share/?' + params.toString();
+      full = 'https://raser.iloveteto.com/?' + params.toString();
     }
     return maxLen > 0 ? full.slice(0, maxLen) : full;
   }
@@ -10423,8 +10423,46 @@ document.addEventListener('DOMContentLoaded', async () => {
       if ((track.url || track.id) && track.platform !== 'local') {
         directStream = await resolveFullTrackStreamForShare(track);
       }
-      const shareUrl = buildRiffShareUrl(track, directStream, '', 0);
-      await navigator.clipboard.writeText(shareUrl);
+
+      let finalUrl = '';
+      try {
+        applyTrackRenames(track);
+        const title = track.title || 'Untitled';
+        const artist = track.artist || '';
+        const fallbackYt = (track.id && track.platform !== 'soundcloud' && track.platform !== 'local') ? ('https://www.youtube.com/watch?v=' + track.id) : '';
+        const isHttpUrl = (u) => typeof u === 'string' && (u.startsWith('http://') || u.startsWith('https://')) && !u.includes('127.0.0.1');
+        const trackUrl = isHttpUrl(track.url) ? track.url : fallbackYt;
+        const customArt = typeof getTrackArt === 'function' ? getTrackArt(track) : null;
+        const rawThumb = (customArt && isHttpUrl(customArt.cover))
+          ? customArt.cover
+          : (track.thumbnail || track.cover || (typeof getTrackThumbUrl === 'function' ? getTrackThumbUrl(track) : '') || '');
+
+        const shortenRes = await fetch('https://raser.iloveteto.com/api/shorten', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            n: title,
+            a: artist,
+            url: trackUrl,
+            img: rawThumb,
+            dur: track.duration ? Math.round(Number(track.duration)) : 0,
+            t: 'music',
+            stream: (directStream && isHttpUrl(directStream) && !directStream.includes('.m3u8')) ? directStream : ''
+          })
+        });
+        const shortenData = await shortenRes.json();
+        if (shortenData && shortenData.url) {
+          finalUrl = shortenData.url;
+        }
+      } catch (err) {
+        console.warn('Raser shortener API failed, falling back to standard share URL:', err);
+      }
+
+      if (!finalUrl) {
+        finalUrl = buildRiffShareUrl(track, directStream, '', 0);
+      }
+
+      await navigator.clipboard.writeText(finalUrl);
       showToast('Share link copied to clipboard!', 'success');
     } catch (e) {
       showToast('Failed to copy share link', 'error');
@@ -11341,6 +11379,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     container.innerHTML = '';
     
     if (!tracks || tracks.length === 0) {
+      container.style.minHeight = '';
       container.style.paddingTop = '0px';
       container.style.paddingBottom = '0px';
       const emptyConfigs = {
@@ -11408,20 +11447,43 @@ document.addEventListener('DOMContentLoaded', async () => {
       }, 250);
     }
 
-    const itemHeight = 64;
+    const itemHeight = 68;
     const overscan = 15;
+    const initialTotalHeight = (tracks ? tracks.length : 0) * itemHeight;
+    container.style.minHeight = initialTotalHeight > 0 ? (initialTotalHeight + 'px') : '';
     
     function renderChunk() {
       if (!scrollParent || container._isDraggingReorder) return;
       const currentList = container._currentTracks || tracks;
       if (!currentList || currentList.length === 0) return;
-      const parentRect = scrollParent.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-      const relativeTop = containerRect.top - parentRect.top + scrollParent.scrollTop;
+      const totalListHeight = currentList.length * itemHeight;
+      const desiredMinHeight = totalListHeight > 0 ? (totalListHeight + 'px') : '';
+      if (container.style.minHeight !== desiredMinHeight) {
+        container.style.minHeight = desiredMinHeight;
+      }
+      
+      let relativeTop = 0;
+      if (container.offsetParent) {
+        let curr = container;
+        while (curr && curr !== scrollParent) {
+          relativeTop += curr.offsetTop || 0;
+          curr = curr.offsetParent;
+        }
+      }
+      if (relativeTop <= 0 && scrollParent) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        if (parentRect.height > 0 && containerRect.height > 0) {
+          relativeTop = Math.max(0, containerRect.top - parentRect.top + scrollParent.scrollTop);
+        } else if (context === 'playlist') {
+          relativeTop = 300;
+        }
+      }
       
       const visibleTop = Math.max(0, scrollParent.scrollTop - relativeTop);
       let startIndex = Math.floor(visibleTop / itemHeight) - overscan;
-      let endIndex = Math.ceil((visibleTop + scrollParent.clientHeight) / itemHeight) + overscan;
+      const clientHeight = (scrollParent && scrollParent.clientHeight > 0) ? scrollParent.clientHeight : (window.innerHeight || 800);
+      let endIndex = Math.ceil((visibleTop + clientHeight) / itemHeight) + overscan;
       
       startIndex = Math.floor(startIndex / 5) * 5;
       endIndex = Math.ceil(endIndex / 5) * 5;
@@ -11438,15 +11500,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       const fragment = document.createDocumentFragment();
       for (let idx = startIndex; idx < endIndex; idx++) {
          const track = currentList[idx];
+         if (!track) continue;
          const row = createTrackRow(track, idx, currentCanonicalId, context, currentList, container);
          if (container._hasInitialRendered) row.style.animation = 'none';
          fragment.appendChild(row);
       }
       
-      container.innerHTML = '';
       container.style.paddingTop = `${startIndex * itemHeight}px`;
-      container.style.paddingBottom = `${(currentList.length - endIndex) * itemHeight}px`;
-      container.appendChild(fragment);
+      container.style.paddingBottom = `${Math.max(0, currentList.length - endIndex) * itemHeight}px`;
+      if (typeof container.replaceChildren === 'function') {
+        container.replaceChildren(fragment);
+      } else {
+        container.innerHTML = '';
+        container.appendChild(fragment);
+      }
       container._hasInitialRendered = true;
       highlightPlayingRow();
     }
@@ -11454,15 +11521,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     container._renderChunk = renderChunk;
 
     container._vScrollHandler = () => {
+      if (!container.offsetParent) return;
       if (!container._ticking) {
-        window.requestAnimationFrame(() => {
-          renderChunk();
-          container._ticking = false;
-        });
         container._ticking = true;
+        window.requestAnimationFrame(() => {
+          try {
+            renderChunk();
+          } catch (e) {
+            console.error('renderChunk error:', e);
+          } finally {
+            container._ticking = false;
+          }
+        });
       }
     };
-    
     if (scrollParent) {
        scrollParent.addEventListener('scroll', container._vScrollHandler, { passive: true });
     }
@@ -11472,6 +11544,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     container._lastEndIndex = -1;
     container._renderedTracksRef = null;
     renderChunk();
+
+    if (!container.offsetParent) {
+      window.requestAnimationFrame(() => {
+        if (container.isConnected && container.offsetParent) {
+          renderChunk();
+        }
+      });
+    }
   }
 
   function highlightPlayingRow() {
@@ -13038,6 +13118,22 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
       });
     };
 
+    const cancelPending = () => {
+      if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      }
+      if (!isDragging) {
+        draggedItem = null;
+        activePointerId = null;
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', onPointerUp);
+        window.removeEventListener('wheel', cancelPending, { passive: true });
+        if (scrollParent) scrollParent.removeEventListener('scroll', cancelPending);
+      }
+    };
+
     const onPointerDown = (e) => {
       if (e.button !== 0) return;
       if (isFilterActive && isFilterActive()) return;
@@ -13054,13 +13150,17 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
       activePointerId = e.pointerId;
       isDragging = false;
 
-      pressTimer = setTimeout(() => {
-        startDrag();
-      }, 250);
+      if (e.pointerType === 'touch') {
+        pressTimer = setTimeout(() => {
+          startDrag();
+        }, 450);
+      }
 
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp);
       window.addEventListener('pointercancel', onPointerUp);
+      window.addEventListener('wheel', cancelPending, { passive: true });
+      if (scrollParent) scrollParent.addEventListener('scroll', cancelPending, { passive: true, once: true });
     };
 
     const updateTarget = () => {
@@ -13100,9 +13200,17 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
       if (!draggedItem) return;
 
       if (!isDragging) {
-        const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
-        if (dist > 7) {
-          clearTimeout(pressTimer);
+        const dx = Math.abs(e.clientX - startX);
+        const dy = Math.abs(e.clientY - startY);
+        const dist = Math.hypot(dx, dy);
+
+        if (e.pointerType === 'touch') {
+          if (dist > 8) cancelPending();
+          return;
+        }
+
+        if (dist >= 12 && dy >= 10 && dy >= dx * 0.7) {
+          if (pressTimer) clearTimeout(pressTimer);
           startDrag();
         } else {
           return;
@@ -13322,9 +13430,12 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
     return newPl;
   }
 
-  function openPlaylistDetail(playlistId) {
+  function openPlaylistDetail(playlistId, keepQuery = false) {
     const pl = state.playlists.find(p => p.id === playlistId);
     if (!pl) return;
+    if (state.currentPlaylistId !== playlistId && !keepQuery) {
+      if (el.playlistSearchInput) el.playlistSearchInput.value = '';
+    }
     state.currentPlaylistId = playlistId;
     state.currentPlaylist = pl;
     if (el.playlistDetailTitle) {
@@ -13427,8 +13538,9 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
         document.documentElement.style.removeProperty('--playlist-accent-color');
       }
     }
-    if (el.playlistTracksList) renderTracks(el.playlistTracksList, filtered, 'playlist');
+    if (el.mainContent) el.mainContent.scrollTop = 0;
     switchView('playlist-detail');
+    if (el.playlistTracksList) renderTracks(el.playlistTracksList, filtered, 'playlist');
     renderPlaylistsList();
   }
 
@@ -13682,11 +13794,25 @@ function renderClickableArtists(container, rawArtist, hintTrack = null) {
     }
     state.currentView = viewName;
 
+    [el.viewDiscover, el.viewFavorites, el.viewAlbums, el.viewLocal, el.viewHistory, el.viewQueue, el.viewPlaylistDetail, el.viewAlbum, el.viewArtist, el.viewSettings].forEach(v => {
+      if (v) v.classList.remove('active');
+    });
+    const targetMap = {
+      'discover': el.viewDiscover,
+      'favorites': el.viewFavorites,
+      'albums': el.viewAlbums,
+      'local': el.viewLocal,
+      'history': el.viewHistory,
+      'queue': el.viewQueue,
+      'playlist-detail': el.viewPlaylistDetail,
+      'album': el.viewAlbum,
+      'artist': el.viewArtist,
+      'settings': el.viewSettings
+    };
+    if (targetMap[viewName]) targetMap[viewName].classList.add('active');
+
     requestAnimationFrame(() => {
       document.querySelectorAll('.no-enter-anim').forEach(c => c.classList.remove('no-enter-anim'));
-      [el.viewDiscover, el.viewFavorites, el.viewAlbums, el.viewLocal, el.viewHistory, el.viewQueue, el.viewPlaylistDetail, el.viewAlbum, el.viewArtist, el.viewSettings].forEach(v => {
-        if (v) v.classList.remove('active');
-      });
 
         const nestedView = viewName === 'playlist-detail' || viewName === 'album' || viewName === 'artist';
         if (!nestedView) {

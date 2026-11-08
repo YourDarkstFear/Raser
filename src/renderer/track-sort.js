@@ -189,6 +189,26 @@ function enableTrackSort(containerOrOpts, onReorderCb) {
     }
   }
 
+  function cancelPendingDrag() {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+    container._isDraggingReorder = false;
+    delete container.dataset.isDraggingTrack;
+    if (!isDragging) {
+      draggedItem = null;
+      activePointerId = null;
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+      window.removeEventListener('wheel', cancelPendingDrag, { passive: true });
+      if (scrollEl) {
+        scrollEl.removeEventListener('scroll', cancelPendingDrag);
+      }
+    }
+  }
+
   function onPointerDown(e) {
     if (e.button !== 0) return;
     if (isFilterActive && isFilterActive()) return;
@@ -205,13 +225,22 @@ function enableTrackSort(containerOrOpts, onReorderCb) {
     activePointerId = e.pointerId;
     isDragging = false;
 
-    pressTimer = setTimeout(() => {
-      startDrag();
-    }, 250);
+    scrollEl = container.closest('.content-view, .main-content, #main-content') || (typeof document !== 'undefined' ? (document.scrollingElement || document.documentElement) : null);
+
+    // On touch devices, a long press without moving is required to start reorder
+    if (e.pointerType === 'touch') {
+      pressTimer = setTimeout(() => {
+        startDrag();
+      }, 450);
+    }
 
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
+    window.addEventListener('wheel', cancelPendingDrag, { passive: true });
+    if (scrollEl) {
+      scrollEl.addEventListener('scroll', cancelPendingDrag, { passive: true, once: true });
+    }
   }
 
   function onPointerMove(e) {
@@ -219,9 +248,21 @@ function enableTrackSort(containerOrOpts, onReorderCb) {
     lastClientY = e.clientY;
 
     if (!isDragging) {
-      const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
-      if (dist > 7) {
-        clearTimeout(pressTimer);
+      const dx = Math.abs(e.clientX - startX);
+      const dy = Math.abs(e.clientY - startY);
+      const dist = Math.hypot(dx, dy);
+
+      // On touch devices, movement before the long-press timer is a native scroll, abort drag
+      if (e.pointerType === 'touch') {
+        if (dist > 8) {
+          cancelPendingDrag();
+        }
+        return;
+      }
+
+      // For mouse/pen, require intentional vertical drag (>= 12px) to prevent accidental shifts during clicks/scrolls
+      if (dist >= 12 && dy >= 10 && dy >= dx * 0.7) {
+        if (pressTimer) clearTimeout(pressTimer);
         startDrag();
       } else {
         return;
@@ -232,14 +273,19 @@ function enableTrackSort(containerOrOpts, onReorderCb) {
   }
 
   function onPointerUp() {
-    clearTimeout(pressTimer);
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
     if (rafId && typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(rafId);
     if (scrollEl) {
       scrollEl.removeEventListener('scroll', onScroll);
+      scrollEl.removeEventListener('scroll', cancelPendingDrag);
     }
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', onPointerUp);
     window.removeEventListener('pointercancel', onPointerUp);
+    window.removeEventListener('wheel', cancelPendingDrag, { passive: true });
 
     delete container.dataset.isDraggingTrack;
 
