@@ -50,6 +50,7 @@
     "url": "https://github.com/darkness-38/Raser/issues"
   },
   "build": {
+    "npmRebuild": false,
     "appId": "io.github.darkness38.raser",
     "productName": "Raser",
     "artifactName": "${name}-${version}-${os}-${arch}.${ext}",
