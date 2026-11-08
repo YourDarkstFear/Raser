@@ -14951,6 +14951,15 @@ function bindCoverHoldZoom(wrapEl) {
     });
   }
 
+  const btnRailNewPlaylist = document.getElementById('btn-rail-new-playlist');
+  if (btnRailNewPlaylist) {
+    btnRailNewPlaylist.addEventListener('click', () => {
+      if (el.newPlaylistInput) el.newPlaylistInput.value = '';
+      if (el.createPlaylistModal) openModal(el.createPlaylistModal);
+      if (el.newPlaylistInput) el.newPlaylistInput.focus();
+    });
+  }
+
   if (el.btnCancelNewPlaylist) {
     el.btnCancelNewPlaylist.addEventListener('click', () => {
       if (el.createPlaylistModal) closeModal(el.createPlaylistModal);
