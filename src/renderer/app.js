@@ -681,6 +681,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   applyScale(savedScale);
 
   function applyScale(scalePercent) {
+    const isMobile = window.innerWidth <= 840 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    if (isMobile) {
+      document.body.style.zoom = '1';
+      document.documentElement.style.setProperty('--app-scale', '1');
+      return;
+    }
     const factor = (scalePercent / 100) * 0.90;
     document.documentElement.style.setProperty('--app-scale', factor.toString());
     if (window.electronAPI && window.electronAPI.setZoomFactor) {
@@ -691,7 +697,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   window.addEventListener('scroll', () => {
-    if (window.scrollY !== 0 || window.scrollX !== 0) {
+    const isMobile = window.innerWidth <= 840 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    if (!isMobile && (window.scrollY !== 0 || window.scrollX !== 0)) {
       window.scrollTo(0, 0);
     }
   }, { passive: true });
@@ -11216,13 +11223,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       <button class="btn-icon-pill btn-row-add-playlist" title="add to playlist">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
       </button>
-      ${(context === 'local' || track.platform === 'local') ? `
+      ${window.electronAPI ? ((context === 'local' || track.platform === 'local') ? `
       <button class="btn-icon-pill btn-row-remove-local btn-remove-local delete-btn" title="Remove from library">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
       </button>` : `
       <button class="btn-icon-pill btn-row-more" title="download & options">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle><circle cx="5" cy="12" r="2"></circle></svg>
-      </button>`}
+      </button>`) : ''}
       ${context === 'playlist' ? `
         <button class="btn-icon-pill btn-row-remove-playlist delete-btn btn-delete btn-remove" title="remove from playlist">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -17117,7 +17124,7 @@ function bindCoverHoldZoom(wrapEl) {
 
   function m3cEnabled() {
     const barOn = localStorage.getItem('riff_m3_cover') !== '0';
-    const heroOn = localStorage.getItem('riff_m3_hero_covers') === '1';
+    const heroOn = localStorage.getItem('riff_m3_hero_covers') !== '0';
     return (barOn || heroOn) && !document.body.classList.contains('perf');
   }
   function m3cInit() {
@@ -17131,11 +17138,20 @@ function bindCoverHoldZoom(wrapEl) {
     m3c.ctx.imageSmoothingEnabled = true;
     m3c.ctx.imageSmoothingQuality = 'high';
     m3c.img.onload = () => { m3c.imgReady = true; m3cDraw(performance.now()); };
-    if (el.playbarArtwork && el.playbarArtwork.src) {
-      m3cSetImage(el.playbarArtwork.src);
+    if (el.playbarArtwork) {
+      if (el.playbarArtwork.src) m3cSetImage(el.playbarArtwork.src);
+      const syncArt = () => {
+        if (el.playbarArtwork.src && el.playbarArtwork.src !== m3c.img.src) {
+          m3cSetImage(el.playbarArtwork.src);
+        }
+      };
+      new MutationObserver(syncArt).observe(el.playbarArtwork, { attributes: true, attributeFilter: ['src'] });
     } else if (state.currentTrack) {
       m3cSetImage(getTrackThumbUrl(state.currentTrack));
     }
+    window.m3cSetImage = m3cSetImage;
+    window.m3cStart = m3cStart;
+    window.applyM3Cover = applyM3Cover;
     const wrap = document.getElementById('playbar-artwork-wrapper');
     if (wrap && !wrap._m3cHoverBound) {
       wrap._m3cHoverBound = true;
@@ -17437,7 +17453,7 @@ function bindCoverHoldZoom(wrapEl) {
 
   const toggleM3Hero = document.getElementById('toggle-m3-hero-covers');
   if (toggleM3Hero) {
-    const isHeroOn = localStorage.getItem('riff_m3_hero_covers') === '1';
+    const isHeroOn = localStorage.getItem('riff_m3_hero_covers') !== '0';
     toggleM3Hero.classList.toggle('active', isHeroOn);
     document.body.classList.toggle('m3-hero-covers-on', isHeroOn);
     toggleM3Hero.onclick = (e) => {
@@ -18495,6 +18511,10 @@ function bindCoverHoldZoom(wrapEl) {
   if (window.electronAPI && window.electronAPI.onWelcomeResult) window.electronAPI.onWelcomeResult((d) => applyWelcomeResult(d));
 
   function checkCompactLayout() {
+    if (!window.electronAPI || window.innerWidth <= 840 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
+      document.body.classList.remove('mini');
+      return;
+    }
     const isMini = window.innerWidth <= 520;
     document.body.classList.toggle('mini', isMini);
     const savedLyricsOn = localStorage.getItem('riff_mini_lyrics') === '1';
